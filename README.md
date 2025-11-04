@@ -39,11 +39,36 @@ echo 'export GOPRIVATE=github.com/anchorageoss/*' >> ~/.bashrc
 # Set GOPRIVATE if not already set
 export GOPRIVATE=github.com/anchorageoss/*
 
-# Build binary to bin/ directory
-go build -o bin/visualsign-turnkey-client .
+# Build binary to bin/ directory using Makefile
+make build
+
+# Or build directly with go
+go build -o bin/turnkey-client .
 
 # Or run directly without building
 go run . <command> [args...]
+```
+
+### Running Tests
+
+```bash
+# Run all tests with coverage
+make test
+
+# Run tests and view coverage report
+make test-coverage
+
+# Run tests and serve coverage interactively (http://localhost:3000)
+make test-cover
+
+# Run specific test suite
+make test-manifest    # Tests for manifest parsing
+make test-crypto      # Tests for cryptography
+make test-apikey      # Tests for API key handling
+make test-client      # Tests for client functionality
+
+# Run benchmarks
+make bench
 ```
 
 ## Commands
@@ -53,8 +78,8 @@ go run . <command> [args...]
 Parse a transaction and extract attestations:
 
 ```bash
-./visualsign-turnkey-client parse \
-  --host https://api.preprod.turnkey.engineering \
+./bin/turnkey-client parse \
+  --host https://api.turnkey.com \
   --organization-id <your-org-id> \
   --key-name preprod \
   --unsigned-payload <base64-encoded-payload>
@@ -65,7 +90,7 @@ Parse a transaction and extract attestations:
 Perform end-to-end verification of a transaction:
 
 ```bash
-./visualsign-turnkey-client verify \
+./bin/turnkey-client verify \
   --host https://api.preprod.turnkey.engineering \
   --organization-id <your-org-id> \
   --key-name preprod \
@@ -84,13 +109,16 @@ Decode and display a QoS manifest from a file or base64 string:
 
 ```bash
 # Decode from file (human-readable)
-./visualsign-turnkey-client decode-manifest --file /tmp/manifest.bin
+./bin/turnkey-client decode-manifest raw --file /tmp/manifest.bin
 
 # Decode from file (JSON output)
-./visualsign-turnkey-client decode-manifest --file /tmp/manifest.bin --json
+./bin/turnkey-client decode-manifest raw --file /tmp/manifest.bin --json
 
 # Decode from base64 string
-./visualsign-turnkey-client decode-manifest --base64 "AQAAAAAAA..." --json
+./bin/turnkey-client decode-manifest raw --base64 "AQAAAAAAA..." --json
+
+# Decode manifest envelope (with approvals)
+./bin/turnkey-client decode-manifest envelope --file /tmp/manifest.bin --json
 ```
 
 #### Flags
@@ -198,7 +226,7 @@ We validate our Go implementation against Turnkey's reference Rust `qos_client`:
 #### Step 1: Save Manifest from Go Client
 
 ```bash
-./visualsign-turnkey-client verify \
+./bin/turnkey-client verify \
   --host https://api.preprod.turnkey.engineering \
   --organization-id <your-org-id> \
   --key-name preprod \
@@ -375,7 +403,7 @@ If manifest hash doesn't match UserData:
 
 ```bash
 # Compare hashes
-./visualsign-turnkey-client verify ... 2>&1 | grep "SHA256"
+./bin/turnkey-client verify ... 2>&1 | grep "SHA256"
 ```
 
 #### Decoding Errors
@@ -444,15 +472,57 @@ type Manifest struct {
 
 ### Code Structure
 
+The project is organized into focused packages for better testability and reusability:
+
 ```
 .
-├── main.go              # CLI setup with urfave/cli
-├── verify.go            # End-to-end verification logic
-├── manifest.go          # QoS manifest types and borsh decoding
-├── verify-manifest.sh   # Automated verification script
-├── go.mod               # Go module definition
-└── README.md            # This file
+├── main.go                    # CLI entry point (23 lines)
+├── go.mod                     # Go module definition
+│
+├── api/                       # Turnkey API client
+│   ├── client.go              # HTTP client, CreateSignablePayload, attestation
+│   ├── types.go               # Request/response types
+│   └── client_test.go         # Internal tests for private methods
+│
+├── cmd/                       # CLI command handlers (urfave/cli)
+│   ├── verify.go              # End-to-end verification command
+│   ├── parse.go               # Parse transaction command
+│   └── decode.go              # Decode manifest commands (raw/envelope)
+│
+├── manifest/                  # QoS manifest parsing and hashing
+│   ├── types.go               # Manifest structures (Borsh-encoded)
+│   ├── parser.go              # Borsh deserialization functions
+│   ├── hash.go                # SHA256 hash computation
+│   └── *_test.go              # Manifest tests
+│
+├── verify/                    # Attestation verification service
+│   ├── service.go             # Core verification logic
+│   ├── types.go               # VerifyRequest, VerifyResult
+│   ├── formatter.go           # Output formatting (no printing)
+│   └── *_test.go              # Verification tests
+│
+├── crypto/                    # Cryptographic operations
+│   ├── signing.go             # ECDSA signing and verification
+│   └── *_test.go              # Crypto tests
+│
+├── keys/                      # API key management
+│   ├── loader.go              # Load keys from ~/.config/turnkey/keys/
+│   └── *_test.go              # Key loading tests
+│
+├── bin/                       # Build output (created by make build)
+│   └── turnkey-client         # Compiled binary
+│
+├── testdata/                  # Test fixtures (Borsh manifests)
+├── Makefile                   # Build and test targets
+├── verify-manifest.sh         # Automated verification script
+└── README.md                  # This file
 ```
+
+**Architecture Layers:**
+- **CLI Layer** (`cmd/`): urfave/cli command handlers with no business logic
+- **Service Layer** (`verify/`, `api/`): Business logic and API client
+- **Library Layer** (all packages): Pure functions, dependency injection via interfaces
+- **Testability**: All layers use interfaces for dependency injection, enabling mock testing
 
 ## Security Considerations
 
@@ -486,8 +556,11 @@ The client verifies:
 ## Example: Complete Verification Workflow
 
 ```bash
+# 0. Build the binary
+make build
+
 # 1. Run verification and save manifest
-./visualsign-turnkey-client verify \
+./bin/turnkey-client verify \
   --host https://api.preprod.turnkey.engineering \
   --organization-id <your-org-id> \
   --key-name preprod \
@@ -495,10 +568,10 @@ The client verifies:
   --save-qos-manifest /tmp/manifest.bin
 
 # 2. Decode manifest with our Go client
-./visualsign-turnkey-client decode-manifest --file /tmp/manifest.bin
+./bin/turnkey-client decode-manifest raw --file /tmp/manifest.bin
 
 # 3. Get JSON output from our Go client
-./visualsign-turnkey-client decode-manifest --file /tmp/manifest.bin --json | jq .
+./bin/turnkey-client decode-manifest raw --file /tmp/manifest.bin --json | jq .
 
 # 4. Verify with Docker container (easiest method)
 docker run -v /tmp:/tmp \
@@ -527,19 +600,74 @@ The client expects API keys in the Turnkey CLI format at `~/.config/turnkey/keys
 ~/.config/turnkey/keys/<key-name>.private  # Format: "hexkey:p256"
 ```
 
-## Development
+## Development and Library Usage
+
+This project can be used both as a CLI tool and as a Go library for programmatic access to Turnkey's Visualsign API and attestation verification.
+
+### Using as a Library
+
+Import the packages you need:
+
+```go
+import (
+    "context"
+    "net/http"
+
+    "github.com/anchorageoss/visualsign-turnkey-client/api"
+    "github.com/anchorageoss/visualsign-turnkey-client/keys"
+    "github.com/anchorageoss/visualsign-turnkey-client/verify"
+)
+
+// Create an API key provider
+keyProvider := &keys.FileKeyProvider{KeyName: "my-key"}
+
+// Create an API client
+client, err := api.NewClient(
+    "https://api.turnkey.com",
+    &http.Client{},
+    "your-org-id",
+    keyProvider,
+)
+
+// Call Turnkey's Visualsign API
+response, err := client.CreateSignablePayload(
+    context.Background(),
+    &api.CreateSignablePayloadRequest{
+        UnsignedPayload: "your-payload",
+        Chain:           "CHAIN_SOLANA",
+    },
+)
+
+// Verify attestations
+verifier := verify.NewService(verifyClient)
+result, err := verifier.Verify(context.Background(), &verify.VerifyRequest{
+    // ... verification request details
+})
+```
+
+All packages use interfaces for dependency injection, making them easy to test and mock.
 
 ### Running Tests
 
 ```bash
-go test ./...
+# Run all tests with coverage
+make test
+
+# Run tests and view coverage report
+make test-coverage
+
+# Run tests and serve coverage interactively
+make test-cover
 ```
 
 ### Building
 
 ```bash
 # Build binary to bin/ directory
-go build -o bin/visualsign-turnkey-client .
+make build
+
+# Or build directly with go
+go build -o bin/turnkey-client .
 
 # Or run directly without building
 go run . <command> [args...]
@@ -547,10 +675,14 @@ go run . <command> [args...]
 
 ### Adding New Features
 
-1. Update structs in `manifest.go` if modifying manifest structure
-2. Update verification logic in `verify.go`
-3. Test against `qos_client` reference implementation using `./verify-manifest.sh`
-4. The verification script automatically uses the Go client's `decode-manifest` command, so it doesn't need updates unless you change the comparison logic
+1. **API Client**: Update `api/client.go` and `api/types.go` for API changes
+2. **Manifest Parsing**: Update `manifest/types.go` for new manifest fields
+3. **Verification Logic**: Update `verify/service.go` for verification changes
+4. **CLI Commands**: Add command handlers to `cmd/`
+5. **Tests**: Add tests in corresponding `*_test.go` files
+6. **Validation**: Test against `qos_client` reference implementation using `./verify-manifest.sh`
+
+For private method testing, add tests to the same-package `*_test.go` file (e.g., `api/client_test.go` can test `generateStamp()` which is private to the `api` package).
 
 ## References
 
