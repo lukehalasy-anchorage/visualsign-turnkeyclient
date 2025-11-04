@@ -81,7 +81,7 @@ Parse a transaction and extract attestations:
 ./bin/turnkey-client parse \
   --host https://api.turnkey.com \
   --organization-id <your-org-id> \
-  --key-name preprod \
+  --key-name testkey \
   --unsigned-payload <base64-encoded-payload>
 ```
 
@@ -91,9 +91,9 @@ Perform end-to-end verification of a transaction:
 
 ```bash
 ./bin/turnkey-client verify \
-  --host https://api.preprod.turnkey.engineering \
+  --host https://api.turnkey.com \
   --organization-id <your-org-id> \
-  --key-name preprod \
+  --key-name testkey \
   --unsigned-payload <base64-encoded-payload>
 ```
 
@@ -163,7 +163,7 @@ The verify command performs comprehensive validation:
 
 📋 Manifest Details:
   Namespace:
-    Name: preprod/anchorageoss/visualsign-parser
+    Name: testkey/anchorageoss/visualsign-parser
     Nonce: 20251001
     Quorum Key: 04451028fc9d42cef6d8f2a3ebe17d65...
   Pivot Config:
@@ -184,7 +184,7 @@ The QoS ([QuorumOS](https://github.com/tkhq/qos)) manifest defines the security 
 
 The manifest specifies:
 
-- **Namespace**: Organization and enclave identifier (e.g., `preprod/anchorageoss/visualsign-parser`)
+- **Namespace**: Organization and enclave identifier (e.g., `testkey/anchorageoss/visualsign-parser`)
 - **Pivot Config**: Binary hash of the enclave application and restart policy
 - **Manifest Set**: Quorum members who can update the manifest (threshold-based)
 - **Share Set**: Members who hold key shares for cryptographic operations
@@ -227,9 +227,9 @@ We validate our Go implementation against Turnkey's reference Rust `qos_client`:
 
 ```bash
 ./bin/turnkey-client verify \
-  --host https://api.preprod.turnkey.engineering \
+  --host https://api.testkey.turnkey.com \
   --organization-id <your-org-id> \
-  --key-name preprod \
+  --key-name testkey \
   --unsigned-payload 'AQAAAAA...' \
   --save-qos-manifest /tmp/manifest.bin
 ```
@@ -327,9 +327,9 @@ Go client JSON saved to: /tmp/go_manifest_output.json
 
 #### 1. Namespace Validation
 ```
-Name: preprod/anchorageoss/visualsign-parser
+Name: testkey/anchorageoss/visualsign-parser
 ```
-- **Environment**: `preprod` or `prod`
+- **Environment**: `testkey` or `prod`
 - **Organization**: `anchorageoss`
 - **Application**: `visualsign-parser`
 
@@ -386,7 +386,7 @@ UserData (from attestation): 60d9c5754d6979afca7a5e75edfa43b629110301d8c57f9ff17
 **Hash Mismatch Reasons:**
 - ⚠️ **Different manifest versions**: The API may return a newer manifest than what was present at enclave boot time
 - ⚠️ **Manifest update**: The manifest was updated after the enclave started
-- ⚠️ **Environment difference**: Comparing prod manifest against preprod attestation
+- ⚠️ **Environment difference**: Comparing prod manifest against testkey attestation
 
 **Note**: When the Enclave reboots/is redeployed, it generates a new manifest. It's possible that deployments happen without callers knowing about it, so always get latest value and confirm end to end.
 
@@ -396,7 +396,7 @@ UserData (from attestation): 60d9c5754d6979afca7a5e75edfa43b629110301d8c57f9ff17
 
 If manifest hash doesn't match UserData:
 
-1. **Check Environment**: Ensure you're comparing the same environment (preprod vs prod)
+1. **Check Environment**: Ensure you're comparing the same environment (testkey vs prod)
 2. **Check Timing**: Verify the manifest wasn't updated after enclave boot
 3. **Use Reference**: Compare with `qos_client` output to verify decoding is correct
 4. **Check Envelope**: Try comparing envelope hash vs raw manifest hash
@@ -561,9 +561,9 @@ make build
 
 # 1. Run verification and save manifest
 ./bin/turnkey-client verify \
-  --host https://api.preprod.turnkey.engineering \
+  --host https://api.testkey.turnkey.com \
   --organization-id <your-org-id> \
-  --key-name preprod \
+  --key-name testkey \
   --unsigned-payload '<base64-encoded-payload>' \
   --save-qos-manifest /tmp/manifest.bin
 

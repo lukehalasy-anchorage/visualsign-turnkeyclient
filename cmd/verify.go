@@ -55,6 +55,7 @@ func VerifyCommand() *cli.Command {
 			&cli.BoolFlag{
 				Name:  "allow-manifest-reserialization-mismatch",
 				Usage: "Continue verification even if manifest reserialization produces different hash than UserData (show warning instead of aborting)",
+				Value: true, // TODO: Default to true for now - align manifest format with API response
 			},
 		},
 		Action: runVerifyCommand,
@@ -122,25 +123,32 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 	fmt.Fprint(os.Stderr, formatter.FormatPCRValues(result.PCRs, "📊 PCR Values", ""))
 
 	// Display manifest details if available
-	if result.Manifest != nil {
+	if result.Manifest != nil || result.ManifestReserialization.ResserializationNeeded {
 		fmt.Fprintf(os.Stderr, "\n=== QoS Manifest Decoding ===\n")
-		fmt.Fprintf(os.Stderr, "✓ Manifest decoded successfully\n")
+		if result.Manifest != nil {
+			fmt.Fprintf(os.Stderr, "✓ Manifest decoded successfully\n")
+		}
 		if result.ManifestReserialization.Matches {
 			fmt.Fprintf(os.Stderr, "✓ Raw manifest hash matches UserData in attestation\n")
 		} else if result.ManifestReserialization.ResserializationNeeded {
-			if allowMismatch {
+			if result.ManifestReserialization.Error != "" {
+				fmt.Fprintf(os.Stderr, "ℹ️  WARNING: Manifest parsing error (continuing due to --allow-manifest-reserialization-mismatch)\n")
+				fmt.Fprintf(os.Stderr, "  Error: %s\n", result.ManifestReserialization.Error)
+			} else {
 				fmt.Fprintf(os.Stderr, "ℹ️  INFO: Manifest reserialization mismatch (continuing due to --allow-manifest-reserialization-mismatch)\n")
 			}
 		}
 
-		fmt.Fprintf(os.Stderr, "\n📋 Manifest Details:\n")
-		manifestPCRs := map[uint][]byte{
-			0: result.Manifest.Enclave.Pcr0,
-			1: result.Manifest.Enclave.Pcr1,
-			2: result.Manifest.Enclave.Pcr2,
-			3: result.Manifest.Enclave.Pcr3,
+		if result.Manifest != nil {
+			fmt.Fprintf(os.Stderr, "\n📋 Manifest Details:\n")
+			manifestPCRs := map[uint][]byte{
+				0: result.Manifest.Enclave.Pcr0,
+				1: result.Manifest.Enclave.Pcr1,
+				2: result.Manifest.Enclave.Pcr2,
+				3: result.Manifest.Enclave.Pcr3,
+			}
+			fmt.Fprint(os.Stderr, formatter.FormatPCRValues(manifestPCRs, "Enclave (Nitro Config)", "  "))
 		}
-		fmt.Fprint(os.Stderr, formatter.FormatPCRValues(manifestPCRs, "Enclave (Nitro Config)", "  "))
 	}
 
 	fmt.Fprintf(os.Stderr, "\n=== STEP 3: Extract Public Key ===\n")

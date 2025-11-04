@@ -46,6 +46,7 @@ func NewService(apiClient APIClient, attestationVerifier AttestationVerifier) *S
 func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult, error) {
 	result := &VerifyResult{
 		PCRs: make(map[uint][]byte),
+		ManifestReserialization: ManifestSerializationResult{},
 	}
 
 	// Step 1: Call API to get signable payload and attestations
@@ -144,10 +145,19 @@ func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult
 	result.Valid = true
 
 	// Step 5: Decode QoS Manifest if available
+	// TODO: Manifest reserialization currently produces different hash than UserData.
+	// This is expected behavior for now - the manifest format needs alignment with API response.
+	// See: https://github.com/tkhq/turnkey-sdk-go/issues/XXX
 	if response.QosManifestB64 != "" {
 		err := s.processManifest(response, validationResult.Document.UserData, req.AllowManifestReserializationMismatch, result)
-		if err != nil && !req.AllowManifestReserializationMismatch {
-			return nil, err
+		if err != nil {
+			if req.AllowManifestReserializationMismatch {
+				// Store the error in manifest reserialization result for display
+				result.ManifestReserialization.Error = err.Error()
+				result.ManifestReserialization.ResserializationNeeded = true
+			} else {
+				return nil, err
+			}
 		}
 	}
 

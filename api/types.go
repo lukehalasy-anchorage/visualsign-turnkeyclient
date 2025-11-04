@@ -70,6 +70,7 @@ type TurnkeyVisualSignResponse struct {
 
 // TurnkeyBootProof represents the boot proof object in the response
 type TurnkeyBootProof struct {
+	AwsAttestationDocB64   string `json:"awsAttestationDocB64"`
 	QosManifestB64         string `json:"qosManifestB64"`
 	QosManifestEnvelopeB64 string `json:"qosManifestEnvelopeB64"`
 }

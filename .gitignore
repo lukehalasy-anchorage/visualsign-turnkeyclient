@@ -34,4 +34,4 @@ go.work.sum
 
 # claude really likes to make binaries in top level
 visualsign-turnkeyclient
-bin/
+bin/*

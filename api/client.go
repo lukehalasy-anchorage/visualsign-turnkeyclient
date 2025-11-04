@@ -139,6 +139,11 @@ func (c *Client) CreateSignablePayload(ctx context.Context, req *CreateSignableP
 		attestations[AppAttestationKey] = string(appAttestationJSON)
 	}
 
+	// Extract boot attestation from bootProof if available
+	if turnkeyResp.BootProof != nil && turnkeyResp.BootProof.AwsAttestationDocB64 != "" {
+		attestations[BootAttestationKey] = turnkeyResp.BootProof.AwsAttestationDocB64
+	}
+
 	// Extract qosManifestB64 and qosManifestEnvelopeB64 from bootProof if available
 	var qosManifestB64, qosManifestEnvelopeB64 string
 	if turnkeyResp.BootProof != nil {
