@@ -50,6 +50,7 @@ type VerifyRequest struct {
 	QosManifestHex                        string
 	PivotBinaryHashHex                    string
 	SaveManifestPath                      string
+	Chain                                 string
 	AllowManifestReserializationMismatch  bool
 }
 
@@ -80,6 +81,8 @@ type ManifestSerializationResult struct {
 	ReserializedManifestHash string
 	EnvelopeHash             string
 	UserDataHash             string
+	RawManifestB64           string // Base64-encoded manifest for debugging
+	EnvelopeB64              string // Base64-encoded envelope for debugging
 	Matches                  bool
 	ResserializationNeeded   bool
 	Error                    string

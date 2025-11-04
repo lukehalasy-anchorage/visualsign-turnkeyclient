@@ -52,10 +52,19 @@ func VerifyCommand() *cli.Command {
 				Name:  "save-qos-manifest",
 				Usage: "Save the QoS manifest envelope to a binary file at the specified path",
 			},
+			&cli.StringFlag{
+				Name:  "chain",
+				Usage: "Blockchain network (CHAIN_SOLANA, CHAIN_ETHEREUM, etc)",
+				Value: "CHAIN_SOLANA",
+			},
 			&cli.BoolFlag{
 				Name:  "allow-manifest-reserialization-mismatch",
 				Usage: "Continue verification even if manifest reserialization produces different hash than UserData (show warning instead of aborting)",
 				Value: true, // TODO: Default to true for now - align manifest format with API response
+			},
+			&cli.BoolFlag{
+				Name:  "debug",
+				Usage: "Enable debug output (attestation document, PCR values, manifest details)",
 			},
 		},
 		Action: runVerifyCommand,
@@ -71,7 +80,9 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 	qosManifestHex := cmd.String("qos-manifest-hex")
 	pivotBinaryHashHex := cmd.String("pivot-binary-hash-hex")
 	saveManifestPath := cmd.String("save-qos-manifest")
+	chain := cmd.String("chain")
 	allowMismatch := cmd.Bool("allow-manifest-reserialization-mismatch")
+	debug := cmd.Bool("debug")
 
 	// Create API client
 	httpClient := &http.Client{}
@@ -95,6 +106,7 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 		QosManifestHex:                       qosManifestHex,
 		PivotBinaryHashHex:                   pivotBinaryHashHex,
 		SaveManifestPath:                     saveManifestPath,
+		Chain:                                chain,
 		AllowManifestReserializationMismatch: allowMismatch,
 	})
 	if err != nil {
@@ -114,13 +126,26 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 
 	// Format and print PCR values
 	formatter := verify.NewFormatter()
-	if len(result.UserData) > 0 {
-		fmt.Fprintf(os.Stderr, "\n📋 UserData (QoS Manifest Hash / Pivot Binary Hash):\n")
-		fmt.Fprintf(os.Stderr, "  Hex: %s\n", result.QosManifestHash)
-	}
 
-	// Print PCR values
-	fmt.Fprint(os.Stderr, formatter.FormatPCRValues(result.PCRs, "📊 PCR Values", ""))
+	// Print debug information if requested
+	if debug {
+		// Print raw attestation document for debugging
+		if result.AttestationDocument != nil {
+			attestationJSON, err := json.MarshalIndent(result.AttestationDocument, "", "  ")
+			if err == nil {
+				fmt.Fprintf(os.Stderr, "\n📋 Raw Attestation Document:\n")
+				fmt.Fprintf(os.Stderr, "%s\n", string(attestationJSON))
+			}
+		}
+
+		if len(result.UserData) > 0 {
+			fmt.Fprintf(os.Stderr, "\n📋 UserData (QoS Manifest Hash / Pivot Binary Hash):\n")
+			fmt.Fprintf(os.Stderr, "  Hex: %s\n", result.QosManifestHash)
+		}
+
+		// Print PCR values
+		fmt.Fprint(os.Stderr, formatter.FormatPCRValues(result.PCRs, "📊 PCR Values", ""))
+	}
 
 	// Display manifest details if available
 	if result.Manifest != nil || result.ManifestReserialization.ResserializationNeeded {
@@ -139,15 +164,59 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 			}
 		}
 
-		if result.Manifest != nil {
-			fmt.Fprintf(os.Stderr, "\n📋 Manifest Details:\n")
-			manifestPCRs := map[uint][]byte{
-				0: result.Manifest.Enclave.Pcr0,
-				1: result.Manifest.Enclave.Pcr1,
-				2: result.Manifest.Enclave.Pcr2,
-				3: result.Manifest.Enclave.Pcr3,
+		if debug {
+			// Display hash details only if there's a mismatch or error
+			hashMismatch := result.ManifestReserialization.UserDataHash != "" &&
+				result.ManifestReserialization.RawManifestHash != "" &&
+				result.ManifestReserialization.RawManifestHash != result.ManifestReserialization.UserDataHash &&
+				(result.ManifestReserialization.EnvelopeHash == "" || result.ManifestReserialization.EnvelopeHash != result.ManifestReserialization.UserDataHash)
+
+			hasError := result.ManifestReserialization.Error != ""
+
+			if hashMismatch || hasError {
+				fmt.Fprintf(os.Stderr, "\n📊 Manifest Hash Details (DEBUG):\n")
+				if result.ManifestReserialization.UserDataHash != "" {
+					fmt.Fprintf(os.Stderr, "  UserData (from attestation):     %s\n", result.ManifestReserialization.UserDataHash)
+				}
+				if result.ManifestReserialization.RawManifestHash != "" {
+					match := ""
+					if result.ManifestReserialization.RawManifestHash == result.ManifestReserialization.UserDataHash {
+						match = " ✅ MATCHES UserData"
+					}
+					fmt.Fprintf(os.Stderr, "  Raw Manifest (from API):        %s%s\n", result.ManifestReserialization.RawManifestHash, match)
+				}
+				if result.ManifestReserialization.ReserializedManifestHash != "" {
+					fmt.Fprintf(os.Stderr, "  Reserialized Manifest:          %s\n", result.ManifestReserialization.ReserializedManifestHash)
+				}
+				if result.ManifestReserialization.EnvelopeHash != "" {
+					match := ""
+					if result.ManifestReserialization.EnvelopeHash == result.ManifestReserialization.UserDataHash {
+						match = " ✅ MATCHES UserData"
+					}
+					fmt.Fprintf(os.Stderr, "  Manifest Envelope (from API):   %s%s\n", result.ManifestReserialization.EnvelopeHash, match)
+				}
+
+				// Display raw payload for debugging
+				if result.ManifestReserialization.RawManifestB64 != "" {
+					fmt.Fprintf(os.Stderr, "\n  Raw Manifest Payload (base64):\n")
+					fmt.Fprintf(os.Stderr, "    %s\n", result.ManifestReserialization.RawManifestB64)
+				}
+				if result.ManifestReserialization.EnvelopeB64 != "" {
+					fmt.Fprintf(os.Stderr, "\n  Manifest Envelope Payload (base64):\n")
+					fmt.Fprintf(os.Stderr, "    %s\n", result.ManifestReserialization.EnvelopeB64)
+				}
 			}
-			fmt.Fprint(os.Stderr, formatter.FormatPCRValues(manifestPCRs, "Enclave (Nitro Config)", "  "))
+
+			if result.Manifest != nil {
+				fmt.Fprintf(os.Stderr, "\n📋 Manifest Details:\n")
+				manifestPCRs := map[uint][]byte{
+					0: result.Manifest.Enclave.Pcr0,
+					1: result.Manifest.Enclave.Pcr1,
+					2: result.Manifest.Enclave.Pcr2,
+					3: result.Manifest.Enclave.Pcr3,
+				}
+				fmt.Fprint(os.Stderr, formatter.FormatPCRValues(manifestPCRs, "Enclave (Nitro Config)", "  "))
+			}
 		}
 	}
 

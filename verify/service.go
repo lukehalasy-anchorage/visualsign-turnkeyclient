@@ -50,9 +50,13 @@ func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult
 	}
 
 	// Step 1: Call API to get signable payload and attestations
+	chain := req.Chain
+	if chain == "" {
+		chain = "CHAIN_SOLANA" // default to Solana if not specified
+	}
 	apiReq := &api.CreateSignablePayloadRequest{
 		UnsignedPayload: req.UnsignedPayload,
-		Chain:           "CHAIN_SOLANA",
+		Chain:           chain,
 	}
 
 	response, err := s.apiClient.CreateSignablePayload(ctx, apiReq)
@@ -98,6 +102,13 @@ func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult
 	result.PCRs = validationResult.Document.PCRs
 	result.UserData = validationResult.Document.UserData
 	result.AttestationDocument = validationResult.Document
+
+	// Extract and set QoS manifest hash from UserData early, so it's available
+	// even if manifest processing fails later
+	if len(result.UserData) > 0 {
+		result.QosManifestHash = hex.EncodeToString(result.UserData)
+		result.PivotBinaryHash = hex.EncodeToString(result.UserData)
+	}
 
 	// Verify UserData against provided QoS manifest if given
 	if req.QosManifestHex != "" {
@@ -246,16 +257,39 @@ func (s *Service) verifyUserData(userData []byte, expectedHashHex string) error 
 func (s *Service) processManifest(response *api.SignablePayloadResponse, userData []byte,
 	allowMismatch bool, result *VerifyResult) error {
 
-	decodedManifest, manifestBytes, _, err := manifest.DecodeManifestFromBase64(response.QosManifestB64)
+	// Compute raw manifest hash before attempting full deserialization
+	// This helps debug even if the full manifest parsing fails
+	rawManifestBytes, _ := base64.StdEncoding.DecodeString(response.QosManifestB64)
+	rawManifestHash := manifest.ComputeHash(rawManifestBytes)
+
+	// Try to decode the manifest envelope if available, otherwise use raw manifest
+	// The API returns both QosManifestB64 (raw) and QosManifestEnvelopeB64 (with signatures)
+	var decodedManifest *manifest.Manifest
+	var manifestBytes []byte
+	var err error
+
+	if response.QosManifestEnvelopeB64 != "" {
+		// Try envelope first (with approvals/signatures)
+		_, decodedManifest, manifestBytes, _, err = manifest.DecodeManifestEnvelopeFromBase64(response.QosManifestEnvelopeB64)
+	}
+	if err != nil || decodedManifest == nil {
+		// Fall back to raw manifest if envelope fails
+		decodedManifest, manifestBytes, err = manifest.DecodeRawManifestFromBase64(response.QosManifestB64)
+	}
 	if err != nil {
+		// Store what we know for debugging, even if parsing failed
+		result.ManifestReserialization.RawManifestHash = rawManifestHash
+		result.ManifestReserialization.RawManifestB64 = response.QosManifestB64
+		result.ManifestReserialization.EnvelopeB64 = response.QosManifestEnvelopeB64
+		if len(userData) > 0 {
+			result.ManifestReserialization.UserDataHash = hex.EncodeToString(userData)
+		}
 		return fmt.Errorf("failed to decode QoS manifest: %w", err)
 	}
 
 	result.Manifest = decodedManifest
 
-	// Compute different hashes
-	rawManifestBytes, _ := base64.StdEncoding.DecodeString(response.QosManifestB64)
-	rawManifestHash := manifest.ComputeHash(rawManifestBytes)
+	// Compute reserialized hash
 	reserializedManifestHash := manifest.ComputeHash(manifestBytes)
 
 	serializationResult := ManifestSerializationResult{
@@ -276,14 +310,27 @@ func (s *Service) processManifest(response *api.SignablePayloadResponse, userDat
 		userDataHex := hex.EncodeToString(userData)
 		serializationResult.UserDataHash = userDataHex
 
-		if rawManifestHash == userDataHex {
+		// Check if raw manifest matches
+		rawManifestMatches := rawManifestHash == userDataHex
+
+		// Check if envelope matches
+		envelopeMatches := false
+		if serializationResult.EnvelopeHash != "" {
+			envelopeMatches = serializationResult.EnvelopeHash == userDataHex
+		}
+
+		if rawManifestMatches || envelopeMatches {
 			serializationResult.Matches = true
 		} else {
 			serializationResult.ResserializationNeeded = true
 			if !allowMismatch {
-				serializationResult.Error = fmt.Sprintf(
-					"manifest reserialization mismatch: boot-time %s != api %s",
+				mismatchMsg := fmt.Sprintf(
+					"manifest hash mismatch: boot-time %s != raw-manifest %s",
 					userDataHex, rawManifestHash)
+				if serializationResult.EnvelopeHash != "" {
+					mismatchMsg += fmt.Sprintf(" != envelope %s", serializationResult.EnvelopeHash)
+				}
+				serializationResult.Error = mismatchMsg
 				return errors.New(serializationResult.Error)
 			}
 		}
