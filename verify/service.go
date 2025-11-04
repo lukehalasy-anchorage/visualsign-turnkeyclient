@@ -21,7 +21,6 @@ import (
 // APIClient interface for making API calls
 type APIClient interface {
 	CreateSignablePayload(ctx context.Context, req *api.CreateSignablePayloadRequest) (*api.SignablePayloadResponse, error)
-	GetBootAttestationForPublicKey(ctx context.Context, publicKey string) (string, error)
 }
 
 // AttestationVerifier interface for verifying attestations

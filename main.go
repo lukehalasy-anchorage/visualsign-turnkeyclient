@@ -17,6 +17,7 @@ func main() {
 			cmd.ParseCommand(),
 			cmd.VerifyCommand(),
 			cmd.DecodeCommand(),
+			cmd.AttestationCommand(),
 		},
 	}
 

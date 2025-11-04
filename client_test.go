@@ -229,8 +229,8 @@ func createTestPrivateKey(t *testing.T) *ecdsa.PrivateKey {
 	return privKey
 }
 
-// TestGetBootAttestationForPublicKey tests boot attestation retrieval
-func TestGetBootAttestationForPublicKey(t *testing.T) {
+// TestGetBootAttestation tests boot attestation retrieval with default enclave type
+func TestGetBootAttestation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := api.AttestationQueryResponse{
 			AttestationDocument: "test-attestation-doc",
@@ -251,10 +251,38 @@ func TestGetBootAttestationForPublicKey(t *testing.T) {
 		},
 	}
 
-	attestation, err := client.GetBootAttestationForPublicKey(context.Background(), "pubkey-123")
+	attestation, err := client.GetBootAttestation(context.Background(), "pubkey-123", "")
 
 	require.NoError(t, err)
 	require.Equal(t, "test-attestation-doc", attestation)
+}
+
+// TestGetBootAttestationWithCustomEnclaveType tests boot attestation retrieval with custom enclave type
+func TestGetBootAttestationWithCustomEnclaveType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := api.AttestationQueryResponse{
+			AttestationDocument: "test-attestation-doc-custom",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	privKey := createTestPrivateKey(t)
+	client := &api.Client{
+		HostURI: server.URL,
+		HTTPClient: &http.Client{},
+		APIKey: &api.TurnkeyAPIKey{
+			PublicKey: "test-public-key",
+			PrivateKey: privKey,
+			OrganizationID: "test-org",
+		},
+	}
+
+	attestation, err := client.GetBootAttestation(context.Background(), "pubkey-123", "custom-enclave")
+
+	require.NoError(t, err)
+	require.Equal(t, "test-attestation-doc-custom", attestation)
 }
 
 // TestFileAPIKeyProviderGetAPIKey tests file-based key provider

@@ -137,15 +137,6 @@ func (c *Client) CreateSignablePayload(ctx context.Context, req *CreateSignableP
 			return nil, fmt.Errorf("failed to marshal app attestation: %w", err)
 		}
 		attestations[AppAttestationKey] = string(appAttestationJSON)
-
-		// Get boot attestation using the public key
-		bootAttestation, err := c.getBootAttestation(ctx, turnkeyResp.Response.ParsedTransaction.Signature.PublicKey)
-		if err != nil {
-			// Don't fail the entire request if boot attestation fails
-			// Log to stderr but continue
-		} else if bootAttestation != "" {
-			attestations[BootAttestationKey] = bootAttestation
-		}
 	}
 
 	// Extract qosManifestB64 and qosManifestEnvelopeB64 from bootProof if available
@@ -164,12 +155,16 @@ func (c *Client) CreateSignablePayload(ctx context.Context, req *CreateSignableP
 	}, nil
 }
 
-// getBootAttestation retrieves the boot attestation document for a given public key
-func (c *Client) getBootAttestation(ctx context.Context, publicKey string) (string, error) {
+// GetBootAttestation retrieves boot attestation for a specific public key and enclave type
+func (c *Client) GetBootAttestation(ctx context.Context, publicKey, enclaveType string) (string, error) {
+	if enclaveType == "" {
+		enclaveType = "signer"
+	}
+
 	// Create the attestation query request
 	reqBody := AttestationQueryRequest{
 		OrganizationID: c.APIKey.OrganizationID,
-		EnclaveType:    "signer",
+		EnclaveType:    enclaveType,
 		PublicKey:      publicKey,
 	}
 
@@ -217,11 +212,6 @@ func (c *Client) getBootAttestation(ctx context.Context, publicKey string) (stri
 	}
 
 	return attestationResp.AttestationDocument, nil
-}
-
-// GetBootAttestationForPublicKey retrieves boot attestation for a specific public key
-func (c *Client) GetBootAttestationForPublicKey(ctx context.Context, publicKey string) (string, error) {
-	return c.getBootAttestation(ctx, publicKey)
 }
 
 // generateStamp creates an API key stamp for the request
