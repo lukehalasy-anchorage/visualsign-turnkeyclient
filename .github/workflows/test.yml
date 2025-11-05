@@ -21,8 +21,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25.0'
           cache: true
+
+      - name: Configure git for private repos
+        run: git config --global url."https://${{ github.token }}@github.com/".insteadOf "https://github.com/"
 
       - name: Download dependencies
         run: go mod download
@@ -77,8 +80,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25.0'
           cache: true
+
+      - name: Configure git for private repos
+        run: git config --global url."https://${{ github.token }}@github.com/".insteadOf "https://github.com/"
 
       - name: Build
         run: CGO_ENABLED=0 go build -o turnkey-client .
@@ -103,11 +109,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.25.0'
           cache: true
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: latest
-          args: --timeout=10m
+      - name: Configure git for private repos
+        run: git config --global url."https://${{ github.token }}@github.com/".insteadOf "https://github.com/"
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint
+        run: golangci-lint run ./... --timeout=10m
