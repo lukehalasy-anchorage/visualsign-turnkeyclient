@@ -86,7 +86,7 @@ func TestCreateSignablePayloadSuccess(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -136,7 +136,7 @@ func TestCreateSignablePayloadNetworkError(t *testing.T) {
 func TestCreateSignablePayloadBadStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"bad request"}`))
+		_, _ = w.Write([]byte(`{"error":"bad request"}`))
 	}))
 	defer server.Close()
 
@@ -236,7 +236,7 @@ func TestGetBootAttestation(t *testing.T) {
 			AttestationDocument: "test-attestation-doc",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -264,7 +264,7 @@ func TestGetBootAttestationWithCustomEnclaveType(t *testing.T) {
 			AttestationDocument: "test-attestation-doc-custom",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -315,13 +315,7 @@ func TestFileAPIKeyProviderGetAPIKey(t *testing.T) {
 	require.NoError(t, err)
 
 	// Override home directory
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	provider := &keys.FileKeyProvider{KeyName: keyName}
 	apiKey, err := provider.GetAPIKey(context.Background())

@@ -3,6 +3,10 @@ package main
 import (
 	_ "embed"
 	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/anchorageoss/visualsign-turnkeyclient/manifest"
 )
 
 // Embedded test fixtures
@@ -25,6 +29,33 @@ func getTurnkeyAttestation() string {
 // This is a real manifest file in Borsh format from Turnkey
 func getTestManifest() []byte {
 	return testManifestBinary
+}
+
+// TestManifestParsing tests parsing of the embedded test manifest
+func TestManifestParsing(t *testing.T) {
+	manifestData := getTestManifest()
+	require.NotEmpty(t, manifestData)
+
+	m, manifestBytes, err := manifest.DecodeRawManifestFromBase64(strings.TrimSpace(string(manifestData)))
+	require.NoError(t, err)
+	require.NotNil(t, m)
+	require.NotEmpty(t, manifestBytes)
+
+	// Verify manifest has expected structure
+	require.NotNil(t, m.Namespace)
+	require.NotNil(t, m.Enclave)
+	require.NotEmpty(t, m.Enclave.Pcr0)
+	require.NotEmpty(t, m.Enclave.Pcr1)
+	require.NotEmpty(t, m.Enclave.Pcr2)
+	require.NotEmpty(t, m.Enclave.Pcr3)
+}
+
+// TestTurnkeyAttestationAvailable tests that the turnkey attestation fixture is available
+func TestTurnkeyAttestationAvailable(t *testing.T) {
+	attestation := getTurnkeyAttestation()
+	require.NotEmpty(t, attestation)
+	// Attestation document should be base64 encoded
+	require.Greater(t, len(attestation), 0)
 }
 
 // Commands to obtain test fixtures:

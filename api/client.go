@@ -96,7 +96,9 @@ func (c *Client) CreateSignablePayload(ctx context.Context, req *CreateSignableP
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request to Turnkey visualsign API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	// Check HTTP status
 	if resp.StatusCode != http.StatusOK {
@@ -201,7 +203,9 @@ func (c *Client) GetBootAttestation(ctx context.Context, publicKey, enclaveType 
 	if err != nil {
 		return "", fmt.Errorf("failed to send request to attestation API: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	// Check HTTP status
 	if resp.StatusCode != http.StatusOK {

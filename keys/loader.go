@@ -104,15 +104,16 @@ func LoadAPIKeyFromFile(keyName string) (*api.TurnkeyAPIKey, error) {
 	}
 
 	// Create ECDSA private key
+	ecdsaCurve := elliptic.P256()
 	privateKey := &ecdsa.PrivateKey{
 		PublicKey: ecdsa.PublicKey{
-			Curve: elliptic.P256(),
+			Curve: ecdsaCurve,
 		},
 		D: new(big.Int).SetBytes(privateKeyBytes),
 	}
 
 	// Calculate public key point
-	privateKey.PublicKey.X, privateKey.PublicKey.Y = privateKey.PublicKey.Curve.ScalarBaseMult(privateKeyBytes)
+	privateKey.X, privateKey.Y = ecdsaCurve.ScalarBaseMult(privateKeyBytes)
 
 	return &api.TurnkeyAPIKey{
 		PublicKey:  publicKeyHex,

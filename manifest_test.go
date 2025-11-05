@@ -125,7 +125,7 @@ func TestDecodeRawManifestFromFile(t *testing.T) {
 				file := "testdata/invalid_manifest.bin"
 				err := os.WriteFile(file, []byte{0xFF, 0xFF, 0xFF}, 0o644)
 				require.NoError(t, err)
-				t.Cleanup(func() { os.Remove(file) })
+				t.Cleanup(func() { _ = os.Remove(file) })
 				return file
 			},
 			wantErr: true,

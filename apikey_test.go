@@ -27,7 +27,7 @@ func TestLoadAPIKeyFromFile(t *testing.T) {
 	keyName := "test-key"
 
 	// Create .public file
-	publicKeyHex := hex.EncodeToString(privKey.PublicKey.X.Bytes())
+	publicKeyHex := hex.EncodeToString(privKey.X.Bytes())
 	publicKeyPath := filepath.Join(tempDir, keyName+".public")
 	err = os.WriteFile(publicKeyPath, []byte(publicKeyHex), 0o644)
 	require.NoError(t, err)
@@ -42,14 +42,6 @@ func TestLoadAPIKeyFromFile(t *testing.T) {
 	privateKeyPath := filepath.Join(tempDir, keyName+".private")
 	err = os.WriteFile(privateKeyPath, []byte(privateKeyContent), 0o644)
 	require.NoError(t, err)
-
-	// Temporarily override the home directory for testing
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
 
 	// Create mock .config/turnkey/keys directory structure
 	configDir := filepath.Join(tempDir, ".config", "turnkey", "keys")
@@ -72,7 +64,7 @@ func TestLoadAPIKeyFromFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Set HOME to temp directory
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Load the key
 	apiKey, err := keys.LoadAPIKeyFromFile(keyName)
@@ -97,13 +89,7 @@ func TestLoadAPIKeyMissingPublicKey(t *testing.T) {
 	require.NoError(t, err)
 
 	// Override home directory
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Should fail
 	apiKey, err := keys.LoadAPIKeyFromFile(keyName)
@@ -127,13 +113,7 @@ func TestLoadAPIKeyMissingPrivateKey(t *testing.T) {
 	require.NoError(t, err)
 
 	// Override home directory
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Should fail
 	apiKey, err := keys.LoadAPIKeyFromFile(keyName)
@@ -163,13 +143,7 @@ func TestLoadAPIKeyInvalidPrivateKeyFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	// Override home directory
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Should fail
 	apiKey, err := keys.LoadAPIKeyFromFile(keyName)
@@ -199,13 +173,7 @@ func TestLoadAPIKeyUnsupportedCurve(t *testing.T) {
 	require.NoError(t, err)
 
 	// Override home directory
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Should fail
 	apiKey, err := keys.LoadAPIKeyFromFile(keyName)
@@ -235,13 +203,7 @@ func TestLoadAPIKeyInvalidHex(t *testing.T) {
 	require.NoError(t, err)
 
 	// Override home directory
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Should fail
 	apiKey, err := keys.LoadAPIKeyFromFile(keyName)
@@ -280,13 +242,7 @@ func TestFileAPIKeyProvider(t *testing.T) {
 	require.NoError(t, err)
 
 	// Override home directory
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create provider
 	provider := &keys.FileKeyProvider{KeyName: keyName}
@@ -356,7 +312,7 @@ func TestAPIKeyPrivateKeyProperties(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create public key file
-	publicKeyHex := hex.EncodeToString(privKey.PublicKey.X.Bytes())
+	publicKeyHex := hex.EncodeToString(privKey.X.Bytes())
 	publicKeyPath := filepath.Join(configDir, keyName+".public")
 	err = os.WriteFile(publicKeyPath, []byte(publicKeyHex), 0o644)
 	require.NoError(t, err)
@@ -372,13 +328,7 @@ func TestAPIKeyPrivateKeyProperties(t *testing.T) {
 	require.NoError(t, err)
 
 	// Override home directory
-	oldHome := os.Getenv("HOME")
-	defer func() {
-		if oldHome != "" {
-			os.Setenv("HOME", oldHome)
-		}
-	}()
-	os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Load the key
 	apiKey, err := keys.LoadAPIKeyFromFile(keyName)
@@ -386,10 +336,10 @@ func TestAPIKeyPrivateKeyProperties(t *testing.T) {
 
 	// Verify private key properties
 	require.NotNil(t, apiKey.PrivateKey.D)
-	require.NotNil(t, apiKey.PrivateKey.PublicKey.X)
-	require.NotNil(t, apiKey.PrivateKey.PublicKey.Y)
-	require.Equal(t, elliptic.P256(), apiKey.PrivateKey.PublicKey.Curve)
+	require.NotNil(t, apiKey.PrivateKey.X)
+	require.NotNil(t, apiKey.PrivateKey.Y)
+	require.Equal(t, elliptic.P256(), apiKey.PrivateKey.Curve)
 
 	// Verify public key is on the curve
-	require.True(t, elliptic.P256().IsOnCurve(apiKey.PrivateKey.PublicKey.X, apiKey.PrivateKey.PublicKey.Y))
+	require.True(t, elliptic.P256().IsOnCurve(apiKey.PrivateKey.X, apiKey.PrivateKey.Y))
 }
