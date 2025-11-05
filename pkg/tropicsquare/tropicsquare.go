@@ -27,14 +27,14 @@ func NewMinimalVerifier() (*MinimalVerifier, error) {
 	}, nil
 }
 
-// VerifyAttestation verifies pre-processed attestation data using hardware crypto
+// VerifyAttestation verifies pre-processed attestation data using libtropic
 //
 // This expects data that has been extracted from a full AWS Nitro attestation
 // document by a server. The server should:
 //  1. Parse the CBOR attestation document
 //  2. Validate the certificate chain
 //  3. Extract the signing public key, message, and signature
-//  4. Send only these components to the device
+//  4. Send only these components for verification
 //
 // Parameters:
 //   - publicKey: 65-byte uncompressed P-256 public key (0x04 || X || Y)
@@ -42,18 +42,28 @@ func NewMinimalVerifier() (*MinimalVerifier, error) {
 //   - signature: 64-byte signature (r || s, each 32 bytes)
 //
 // Returns nil if verification succeeds, error otherwise.
+//
+// Note: libtropic expects 64-byte public keys (X || Y without 0x04 prefix),
+// so we strip the prefix if present.
 func (v *MinimalVerifier) VerifyAttestation(
 	publicKey []byte,
 	message []byte,
 	signature []byte,
 ) error {
 	// Validate inputs
-	if len(publicKey) != 65 {
-		return fmt.Errorf("invalid public key length: expected 65 bytes, got %d", len(publicKey))
+	if len(publicKey) != 65 && len(publicKey) != 64 {
+		return fmt.Errorf("invalid public key length: expected 65 or 64 bytes, got %d", len(publicKey))
 	}
-	if publicKey[0] != 0x04 {
-		return fmt.Errorf("invalid public key format: expected uncompressed format (0x04 prefix)")
+
+	// Strip 0x04 prefix if present (libtropic expects 64-byte keys)
+	pubkeyForVerification := publicKey
+	if len(publicKey) == 65 {
+		if publicKey[0] != 0x04 {
+			return fmt.Errorf("invalid public key format: expected uncompressed format (0x04 prefix)")
+		}
+		pubkeyForVerification = publicKey[1:] // Strip prefix
 	}
+
 	if len(signature) != 64 {
 		return fmt.Errorf("invalid signature length: expected 64 bytes, got %d", len(signature))
 	}
@@ -62,8 +72,8 @@ func (v *MinimalVerifier) VerifyAttestation(
 	// The signature is over the hash, not the raw message
 	hash := sha256.Sum256(message)
 
-	// Use hardware P-256 ECDSA verification
-	valid, err := v.device.VerifyECDSA_P256(publicKey, hash[:], signature)
+	// Use libtropic ECDSA verification (software, host-side)
+	valid, err := v.device.VerifyECDSA_P256(pubkeyForVerification, hash[:], signature)
 	if err != nil {
 		return fmt.Errorf("hardware verification failed: %w", err)
 	}

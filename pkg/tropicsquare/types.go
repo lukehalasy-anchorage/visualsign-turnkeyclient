@@ -1,10 +1,11 @@
 package tropicsquare
 
-// Device represents a connection to a Tropic Square TROPIC01 secure element
+// Device represents a connection to Tropic Square TROPIC01 secure element
 type Device struct {
-	// handle will contain the libtropic device handle once SDK is available
-	// For now, this is a placeholder
-	handle interface{}
+	// For pure Go implementation, just tracks initialization state
+	// For CGo implementation, could hold libtropic handle
+	initialized bool
+	handle      interface{} // Optional: for future hardware handle
 }
 
 // DeviceInfo contains information about the Tropic Square device
