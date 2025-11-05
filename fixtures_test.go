@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"os"
 	"strings"
 	"testing"
 
@@ -36,7 +37,12 @@ func TestManifestParsing(t *testing.T) {
 	manifestData := getTestManifest()
 	require.NotEmpty(t, manifestData)
 
-	m, manifestBytes, err := manifest.DecodeRawManifestFromBase64(strings.TrimSpace(string(manifestData)))
+	// Write binary to temp file since DecodeRawManifestFromFile expects a file path
+	tmpFile := t.TempDir() + "/manifest.bin"
+	err := os.WriteFile(tmpFile, manifestData, 0o644)
+	require.NoError(t, err)
+
+	m, manifestBytes, err := manifest.DecodeRawManifestFromFile(tmpFile)
 	require.NoError(t, err)
 	require.NotNil(t, m)
 	require.NotEmpty(t, manifestBytes)
