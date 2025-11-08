@@ -12,9 +12,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/anchorageoss/visualsign-turnkeyclient/api"
 	"github.com/anchorageoss/visualsign-turnkeyclient/keys"
+	"github.com/stretchr/testify/require"
 )
 
 // TestNewTurnkeyClient tests creating a new Turnkey client
@@ -22,8 +22,8 @@ func TestNewTurnkeyClient(t *testing.T) {
 	// Create a mock API key provider
 	mockProvider := &MockAPIKeyProvider{
 		apiKey: &api.TurnkeyAPIKey{
-			PublicKey: "test-public-key",
-			PrivateKey: createTestPrivateKey(t),
+			PublicKey:      "test-public-key",
+			PrivateKey:     createTestPrivateKey(t),
 			OrganizationID: "test-org",
 		},
 	}
@@ -79,9 +79,9 @@ func TestCreateSignablePayloadSuccess(t *testing.T) {
 
 		response.Response.ParsedTransaction.Payload.SignablePayload = "test-payload"
 		response.Response.ParsedTransaction.Signature = &api.TurnkeySignature{
-			Message: "message-hex",
+			Message:   "message-hex",
 			PublicKey: "pubkey-hex",
-			Scheme: "SIGNATURE_SCHEME_TK_API_P256",
+			Scheme:    "SIGNATURE_SCHEME_TK_API_P256",
 			Signature: "sig-hex",
 		}
 
@@ -92,11 +92,11 @@ func TestCreateSignablePayloadSuccess(t *testing.T) {
 
 	privKey := createTestPrivateKey(t)
 	client := &api.Client{
-		HostURI: server.URL,
+		HostURI:    server.URL,
 		HTTPClient: &http.Client{},
 		APIKey: &api.TurnkeyAPIKey{
-			PublicKey: "test-public-key",
-			PrivateKey: privKey,
+			PublicKey:      "test-public-key",
+			PrivateKey:     privKey,
 			OrganizationID: "test-org",
 		},
 	}
@@ -114,11 +114,11 @@ func TestCreateSignablePayloadSuccess(t *testing.T) {
 func TestCreateSignablePayloadNetworkError(t *testing.T) {
 	privKey := createTestPrivateKey(t)
 	client := &api.Client{
-		HostURI: "https://invalid-host-that-does-not-exist.com",
+		HostURI:    "https://invalid-host-that-does-not-exist.com",
 		HTTPClient: &http.Client{},
 		APIKey: &api.TurnkeyAPIKey{
-			PublicKey: "test-public-key",
-			PrivateKey: privKey,
+			PublicKey:      "test-public-key",
+			PrivateKey:     privKey,
 			OrganizationID: "test-org",
 		},
 	}
@@ -142,11 +142,11 @@ func TestCreateSignablePayloadBadStatus(t *testing.T) {
 
 	privKey := createTestPrivateKey(t)
 	client := &api.Client{
-		HostURI: server.URL,
+		HostURI:    server.URL,
 		HTTPClient: &http.Client{},
 		APIKey: &api.TurnkeyAPIKey{
-			PublicKey: "test-public-key",
-			PrivateKey: privKey,
+			PublicKey:      "test-public-key",
+			PrivateKey:     privKey,
 			OrganizationID: "test-org",
 		},
 	}
@@ -166,7 +166,7 @@ func TestTurnkeyStampSerialization(t *testing.T) {
 	stamp := api.TurnkeyStamp{
 		PublicKey: "test-public-key",
 		Signature: "test-signature",
-		Scheme: "SIGNATURE_SCHEME_TK_API_P256",
+		Scheme:    "SIGNATURE_SCHEME_TK_API_P256",
 	}
 
 	data, err := json.Marshal(stamp)
@@ -242,11 +242,11 @@ func TestGetBootAttestation(t *testing.T) {
 
 	privKey := createTestPrivateKey(t)
 	client := &api.Client{
-		HostURI: server.URL,
+		HostURI:    server.URL,
 		HTTPClient: &http.Client{},
 		APIKey: &api.TurnkeyAPIKey{
-			PublicKey: "test-public-key",
-			PrivateKey: privKey,
+			PublicKey:      "test-public-key",
+			PrivateKey:     privKey,
 			OrganizationID: "test-org",
 		},
 	}
@@ -270,11 +270,11 @@ func TestGetBootAttestationWithCustomEnclaveType(t *testing.T) {
 
 	privKey := createTestPrivateKey(t)
 	client := &api.Client{
-		HostURI: server.URL,
+		HostURI:    server.URL,
 		HTTPClient: &http.Client{},
 		APIKey: &api.TurnkeyAPIKey{
-			PublicKey: "test-public-key",
-			PrivateKey: privKey,
+			PublicKey:      "test-public-key",
+			PrivateKey:     privKey,
 			OrganizationID: "test-org",
 		},
 	}

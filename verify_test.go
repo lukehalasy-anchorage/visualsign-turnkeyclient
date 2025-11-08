@@ -3,8 +3,8 @@ package main
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/anchorageoss/visualsign-turnkeyclient/verify"
+	"github.com/stretchr/testify/require"
 )
 
 // TestPrintPCRValuesBasic tests basic PCR value printing
@@ -75,11 +75,11 @@ func TestPrintPCRValuesIndentation(t *testing.T) {
 // TestPrintPCRValuesConsecutiveZeros tests handling of consecutive zero PCRs
 func TestPrintPCRValuesConsecutiveZeros(t *testing.T) {
 	pcrs := map[uint][]byte{
-		0: make([]byte, 48),  // Non-zero
-		5: make([]byte, 48),  // All zeros (start of range)
-		6: make([]byte, 48),  // All zeros
-		7: make([]byte, 48),  // All zeros
-		8: make([]byte, 48),  // All zeros (end of range)
+		0:  make([]byte, 48), // Non-zero
+		5:  make([]byte, 48), // All zeros (start of range)
+		6:  make([]byte, 48), // All zeros
+		7:  make([]byte, 48), // All zeros
+		8:  make([]byte, 48), // All zeros (end of range)
 		15: make([]byte, 48), // Non-zero
 	}
 	// Fill non-zero entries

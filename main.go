@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/urfave/cli/v3"
 	"github.com/anchorageoss/visualsign-turnkeyclient/cmd"
+	"github.com/urfave/cli/v3"
 )
 
 func main() {

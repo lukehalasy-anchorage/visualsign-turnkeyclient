@@ -30,14 +30,14 @@ type AttestationVerifier interface {
 
 // Service handles verification logic
 type Service struct {
-	apiClient          APIClient
+	apiClient           APIClient
 	attestationVerifier AttestationVerifier
 }
 
 // NewService creates a new verification service
 func NewService(apiClient APIClient, attestationVerifier AttestationVerifier) *Service {
 	return &Service{
-		apiClient:          apiClient,
+		apiClient:           apiClient,
 		attestationVerifier: attestationVerifier,
 	}
 }
@@ -45,7 +45,7 @@ func NewService(apiClient APIClient, attestationVerifier AttestationVerifier) *S
 // Verify performs end-to-end verification of a transaction in AWS Nitro enclave
 func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult, error) {
 	result := &VerifyResult{
-		PCRs: make(map[uint][]byte),
+		PCRs:                    make(map[uint][]byte),
 		ManifestReserialization: ManifestSerializationResult{},
 	}
 
@@ -293,7 +293,7 @@ func (s *Service) processManifest(response *api.SignablePayloadResponse, userDat
 	reserializedManifestHash := manifest.ComputeHash(manifestBytes)
 
 	serializationResult := ManifestSerializationResult{
-		RawManifestHash:        rawManifestHash,
+		RawManifestHash:          rawManifestHash,
 		ReserializedManifestHash: reserializedManifestHash,
 	}
 

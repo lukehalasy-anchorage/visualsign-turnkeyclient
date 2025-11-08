@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/urfave/cli/v3"
 	"github.com/anchorageoss/visualsign-turnkeyclient/manifest"
 	"github.com/anchorageoss/visualsign-turnkeyclient/verify"
+	"github.com/urfave/cli/v3"
 )
 
 // DecodeCommand creates the decode commands
 func DecodeCommand() *cli.Command {
 	return &cli.Command{
-		Name:     "decode-manifest",
-		Usage:    "Decode QoS manifest",
+		Name:  "decode-manifest",
+		Usage: "Decode QoS manifest",
 		Commands: []*cli.Command{
 			decodeRawManifestCommand(),
 			decodeManifestEnvelopeCommand(),

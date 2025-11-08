@@ -31,11 +31,7 @@ jobs:
         run: go mod download
 
       - name: Run tests with coverage
-        run: |
-          go test -v -race -coverprofile=coverage.out ./... 2>&1 | tee test-output.txt
-          echo "---"
-          echo "Coverage Summary:"
-          grep "coverage:" test-output.txt | grep "of statements" | tail -1
+        run: make test 2>&1 | tee test-output.txt
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -88,13 +84,13 @@ jobs:
         run: git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Build
-        run: CGO_ENABLED=0 go build -o turnkey-client .
+        run: make build
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: turnkey-client
-          path: turnkey-client
+          path: bin/turnkey-client
 
   lint:
     name: Lint Code
@@ -119,5 +115,5 @@ jobs:
       - name: Install golangci-lint
         run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
-      - name: Run golangci-lint
-        run: golangci-lint run ./... --timeout=10m
+      - name: Run linter
+        run: make lint

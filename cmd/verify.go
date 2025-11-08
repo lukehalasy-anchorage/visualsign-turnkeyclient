@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/urfave/cli/v3"
 	nitroverifier "github.com/anchorageoss/awsnitroverifier"
 	"github.com/anchorageoss/visualsign-turnkeyclient/api"
 	"github.com/anchorageoss/visualsign-turnkeyclient/keys"
 	"github.com/anchorageoss/visualsign-turnkeyclient/verify"
+	"github.com/urfave/cli/v3"
 )
 
 // VerifyCommand creates the verify command

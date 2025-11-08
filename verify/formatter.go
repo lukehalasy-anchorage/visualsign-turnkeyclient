@@ -255,8 +255,8 @@ func (f *Formatter) FormatManifestJSON(m *manifest.Manifest) map[string]interfac
 // FormatManifestEnvelopeJSON formats manifest envelope for JSON output
 func (f *Formatter) FormatManifestEnvelopeJSON(env *manifest.ManifestEnvelope) map[string]interface{} {
 	return map[string]interface{}{
-		"manifest":              f.FormatManifestJSON(&env.Manifest),
-		"manifestSetApprovals":  f.FormatApprovals(env.ManifestSetApprovals),
-		"shareSetApprovals":     f.FormatApprovals(env.ShareSetApprovals),
+		"manifest":             f.FormatManifestJSON(&env.Manifest),
+		"manifestSetApprovals": f.FormatApprovals(env.ManifestSetApprovals),
+		"shareSetApprovals":    f.FormatApprovals(env.ShareSetApprovals),
 	}
 }

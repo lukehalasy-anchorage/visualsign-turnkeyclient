@@ -1,4 +1,4 @@
-.PHONY: test test-coverage test-cover test-verbose build clean help
+.PHONY: test test-coverage test-cover test-verbose build clean help lint fmt
 
 # Default port for coverage server
 PORT ?= :3000
@@ -12,6 +12,8 @@ help:
 	@echo "                           Usage: make test-cover PORT=:8080"
 	@echo "  make build             - Build the application"
 	@echo "  make clean             - Remove build artifacts and test coverage files"
+	@echo "  make fmt               - Format Go code with gofmt"
+	@echo "  make lint              - Run golangci-lint on all packages"
 
 test:
 	go test -v -race -coverprofile=coverage.out ./...
@@ -94,3 +96,15 @@ bench:
 # Run benchmarks with verbose output
 bench-verbose:
 	go test -bench=. -benchmem -v ./...
+
+# Format all Go code
+fmt:
+	@echo "Formatting Go code..."
+	@gofmt -w -s .
+	@echo "✓ Code formatted"
+
+# Run linter
+lint:
+	@echo "Running golangci-lint..."
+	@golangci-lint run ./... --timeout=10m
+	@echo "✓ Linting passed"

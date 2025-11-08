@@ -46,33 +46,33 @@ import (
 
 // VerifyRequest represents the parameters for verification
 type VerifyRequest struct {
-	UnsignedPayload                       string
-	QosManifestHex                        string
-	PivotBinaryHashHex                    string
-	SaveManifestPath                      string
-	Chain                                 string
-	AllowManifestReserializationMismatch  bool
+	UnsignedPayload                      string
+	QosManifestHex                       string
+	PivotBinaryHashHex                   string
+	SaveManifestPath                     string
+	Chain                                string
+	AllowManifestReserializationMismatch bool
 }
 
 // VerifyResult represents the result of verification
 type VerifyResult struct {
-	Valid                    bool                        `json:"valid"`
-	AttestationValid         bool                        `json:"attestationValid"`
-	SignatureValid           bool                        `json:"signatureValid"`
-	ModuleID                 string                      `json:"moduleId"`
-	PublicKeyHex             string                      `json:"publicKey"`
-	SignablePayload          string                      `json:"signablePayload"`
-	MessageHex               string                      `json:"message"`
-	SignatureHex             string                      `json:"signature"`
-	QosManifestHash          string                      `json:"qosManifest,omitempty"`
-	PivotBinaryHash          string                      `json:"pivotBinaryHash,omitempty"`
-	PCR4                     string                      `json:"pcr4,omitempty"`
-	UserData                 []byte                      `json:"-"`
-	PCRs                     map[uint][]byte             `json:"-"`
-	PublicKey                *ecdsa.PublicKey            `json:"-"`
-	Manifest                 *manifest.Manifest          `json:"-"`
-	AttestationDocument      interface{}                 `json:"-"`
-	ManifestReserialization  ManifestSerializationResult `json:"-"`
+	Valid                   bool                        `json:"valid"`
+	AttestationValid        bool                        `json:"attestationValid"`
+	SignatureValid          bool                        `json:"signatureValid"`
+	ModuleID                string                      `json:"moduleId"`
+	PublicKeyHex            string                      `json:"publicKey"`
+	SignablePayload         string                      `json:"signablePayload"`
+	MessageHex              string                      `json:"message"`
+	SignatureHex            string                      `json:"signature"`
+	QosManifestHash         string                      `json:"qosManifest,omitempty"`
+	PivotBinaryHash         string                      `json:"pivotBinaryHash,omitempty"`
+	PCR4                    string                      `json:"pcr4,omitempty"`
+	UserData                []byte                      `json:"-"`
+	PCRs                    map[uint][]byte             `json:"-"`
+	PublicKey               *ecdsa.PublicKey            `json:"-"`
+	Manifest                *manifest.Manifest          `json:"-"`
+	AttestationDocument     interface{}                 `json:"-"`
+	ManifestReserialization ManifestSerializationResult `json:"-"`
 }
 
 // ManifestSerializationResult tracks manifest hash verification

@@ -158,28 +158,28 @@ func TestDecodeRawManifestFromFile(t *testing.T) {
 // TestDecodeRawManifestFromBase64 tests raw manifest decoding from base64
 func TestDecodeRawManifestFromBase64(t *testing.T) {
 	tests := []struct {
-		name      string
+		name        string
 		manifestB64 string
-		wantErr   bool
-		errMsg    string
+		wantErr     bool
+		errMsg      string
 	}{
 		{
-			name:      "invalid base64",
+			name:        "invalid base64",
 			manifestB64: "not-valid-base64!@#$",
-			wantErr:   true,
-			errMsg:    "failed to decode base64",
+			wantErr:     true,
+			errMsg:      "failed to decode base64",
 		},
 		{
-			name:      "empty base64",
+			name:        "empty base64",
 			manifestB64: "",
-			wantErr:   true,
-			errMsg:    "failed to deserialize raw manifest",
+			wantErr:     true,
+			errMsg:      "failed to deserialize raw manifest",
 		},
 		{
-			name:      "valid base64 but invalid manifest data",
+			name:        "valid base64 but invalid manifest data",
 			manifestB64: base64.StdEncoding.EncodeToString([]byte{0xFF, 0xFF, 0xFF}),
-			wantErr:   true,
-			errMsg:    "failed to deserialize raw manifest",
+			wantErr:     true,
+			errMsg:      "failed to deserialize raw manifest",
 		},
 	}
 
@@ -198,10 +198,10 @@ func TestDecodeRawManifestFromBase64(t *testing.T) {
 // TestComputeManifestHash tests hash computation
 func TestComputeManifestHash(t *testing.T) {
 	tests := []struct {
-		name          string
-		data          []byte
-		expectedLen   int
-		shouldNotBe   string // hash that should differ
+		name        string
+		data        []byte
+		expectedLen int
+		shouldNotBe string // hash that should differ
 	}{
 		{
 			name:        "empty data produces hash",

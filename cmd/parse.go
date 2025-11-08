@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/urfave/cli/v3"
 	"github.com/anchorageoss/visualsign-turnkeyclient/api"
 	"github.com/anchorageoss/visualsign-turnkeyclient/keys"
+	"github.com/urfave/cli/v3"
 )
 
 // ParseCommand creates the parse command

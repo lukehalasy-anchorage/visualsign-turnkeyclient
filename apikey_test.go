@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/anchorageoss/visualsign-turnkeyclient/crypto"
 	"github.com/anchorageoss/visualsign-turnkeyclient/keys"
+	"github.com/stretchr/testify/require"
 )
 
 // TestLoadAPIKeyFromFile tests loading a valid API key from files

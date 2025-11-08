@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/anchorageoss/visualsign-turnkeyclient/manifest"
+	"github.com/stretchr/testify/require"
 )
 
 // Embedded test fixtures

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/urfave/cli/v3"
 	"github.com/anchorageoss/visualsign-turnkeyclient/api"
 	"github.com/anchorageoss/visualsign-turnkeyclient/keys"
+	"github.com/urfave/cli/v3"
 )
 
 // AttestationCommand creates the attestation command
 func AttestationCommand() *cli.Command {
 	return &cli.Command{
-		Name:     "attestation",
-		Usage:    "Get boot attestation for a public key",
+		Name:  "attestation",
+		Usage: "Get boot attestation for a public key",
 		Commands: []*cli.Command{
 			getBootAttestationCommand(),
 		},
