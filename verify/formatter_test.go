@@ -49,6 +49,54 @@ func TestFormatPCRValues(t *testing.T) {
 		result := formatter.FormatPCRValues(pcrs, "Zeros", "")
 		require.NotEmpty(t, result)
 	})
+
+	t.Run("PCR 3 with label", func(t *testing.T) {
+		pcrs := map[uint][]byte{
+			3: {0xaa, 0xbb, 0xcc},
+		}
+		result := formatter.FormatPCRValues(pcrs, "PCR3 Test", "")
+		require.Contains(t, result, "Hash of the AWS Role")
+		require.Contains(t, result, "aabbcc")
+	})
+
+	t.Run("PCR 4 with legacy label", func(t *testing.T) {
+		pcrs := map[uint][]byte{
+			4: {0x11, 0x22, 0x33},
+		}
+		result := formatter.FormatPCRValues(pcrs, "PCR4 Test", "")
+		require.Contains(t, result, "legacy")
+		require.Contains(t, result, "112233")
+	})
+
+	t.Run("consecutive all-zero PCRs", func(t *testing.T) {
+		zeroPCR := make([]byte, 48) // All zeros
+		pcrs := map[uint][]byte{
+			5:  zeroPCR,
+			6:  zeroPCR,
+			7:  zeroPCR,
+			10: {0xaa}, // Non-zero
+		}
+		result := formatter.FormatPCRValues(pcrs, "Zero Range", "")
+		require.Contains(t, result, "all zeros")
+		require.Contains(t, result, "PCR[10]")
+		require.Contains(t, result, "aa")
+	})
+
+	t.Run("all PCR types", func(t *testing.T) {
+		pcrs := map[uint][]byte{
+			0:  {0x01},
+			1:  {0x02},
+			2:  {0x03},
+			3:  {0x04},
+			4:  {0x05},
+			15: {0x0f},
+		}
+		result := formatter.FormatPCRValues(pcrs, "All Types", "  ")
+		require.Contains(t, result, "QoS hash")
+		require.Contains(t, result, "Hash of the AWS Role")
+		require.Contains(t, result, "legacy")
+		require.Contains(t, result, "  ")
+	})
 }
 
 func TestFormatManifest(t *testing.T) {
@@ -79,6 +127,58 @@ func TestFormatManifest(t *testing.T) {
 		require.Contains(t, result, "test")
 		require.Contains(t, result, "threshold: 2")
 		require.Contains(t, result, "threshold: 3")
+	})
+
+	t.Run("manifest with members", func(t *testing.T) {
+		longPubKey := make([]byte, 33) // Longer than 16 chars when hex encoded
+		for i := range longPubKey {
+			longPubKey[i] = byte(i)
+		}
+
+		m := &manifest.Manifest{
+			Namespace: manifest.Namespace{
+				Name:      "production",
+				Nonce:     42,
+				QuorumKey: []byte{0xaa, 0xbb},
+			},
+			Pivot: manifest.PivotConfig{
+				Hash:    [32]byte{0x01, 0x02},
+				Restart: manifest.RestartPolicyAlways,
+				Args:    []string{"--verbose", "--port=8080"},
+			},
+			ManifestSet: manifest.ManifestSet{
+				Threshold: 2,
+				Members: []manifest.QuorumMember{
+					{Alias: "member1", PubKey: longPubKey},
+					{Alias: "member2", PubKey: []byte{0x11, 0x22}},
+				},
+			},
+			ShareSet: manifest.ShareSet{
+				Threshold: 3,
+				Members: []manifest.QuorumMember{
+					{Alias: "share1", PubKey: []byte{0x33}},
+				},
+			},
+			Enclave: manifest.NitroConfig{
+				Pcr0:      []byte{0xaa},
+				Pcr1:      []byte{0xbb},
+				Pcr2:      []byte{0xcc},
+				Pcr3:      []byte{0xdd},
+				QosCommit: "abc123",
+			},
+		}
+
+		result := formatter.FormatManifest(m)
+		require.NotEmpty(t, result)
+		require.Contains(t, result, "production")
+		require.Contains(t, result, "42")
+		require.Contains(t, result, "member1")
+		require.Contains(t, result, "member2")
+		require.Contains(t, result, "share1")
+		require.Contains(t, result, "...") // Truncated long pub key
+		require.Contains(t, result, "abc123")
+		require.Contains(t, result, "--verbose")
+		require.Contains(t, result, "Always")
 	})
 }
 
@@ -172,6 +272,40 @@ func TestFormatVerificationResult(t *testing.T) {
 		require.Equal(t, true, formatted["attestationValid"])
 		require.Equal(t, "test-payload", formatted["signablePayload"])
 		require.Equal(t, "pubkey", formatted["publicKey"])
+	})
+
+	t.Run("verification result with QoS manifest", func(t *testing.T) {
+		result := &VerifyResult{
+			AttestationValid: true,
+			SignablePayload:  "test-payload",
+			PublicKeyHex:     "pubkey",
+			SignatureHex:     "signature",
+			MessageHex:       "message",
+			ModuleID:         "module-123",
+			QosManifestHash:  "abc123",
+			PivotBinaryHash:  "def456",
+		}
+
+		formatted := formatter.FormatVerificationResult(result)
+		require.NotNil(t, formatted)
+		require.Equal(t, "abc123", formatted["qosManifest"])
+		require.Equal(t, "def456", formatted["pivotBinaryHash"])
+	})
+
+	t.Run("verification result with PCR4", func(t *testing.T) {
+		result := &VerifyResult{
+			AttestationValid: true,
+			SignablePayload:  "test-payload",
+			PublicKeyHex:     "pubkey",
+			SignatureHex:     "signature",
+			MessageHex:       "message",
+			ModuleID:         "module-123",
+			PCR4:             "pcr4value",
+		}
+
+		formatted := formatter.FormatVerificationResult(result)
+		require.NotNil(t, formatted)
+		require.Equal(t, "pcr4value", formatted["pcr4"])
 	})
 }
 

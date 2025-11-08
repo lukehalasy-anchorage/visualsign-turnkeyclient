@@ -8,6 +8,16 @@ import (
 	"github.com/near/borsh-go"
 )
 
+// reserializeManifest re-encodes a Manifest struct to get its raw bytes
+// This is used to compute hashes consistently across envelope and raw manifest formats
+func reserializeManifest(m Manifest) ([]byte, error) {
+	manifestBytes, err := borsh.Serialize(m)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize manifest: %w", err)
+	}
+	return manifestBytes, nil
+}
+
 // DecodeManifestFromBase64 decodes a base64-encoded manifest envelope and returns the manifest and envelope bytes
 func DecodeManifestFromBase64(manifestB64 string) (*Manifest, []byte, []byte, error) {
 	// Decode base64
@@ -23,9 +33,9 @@ func DecodeManifestFromBase64(manifestB64 string) (*Manifest, []byte, []byte, er
 	}
 
 	// Re-encode just the Manifest struct to get its raw bytes
-	manifestBytes, err := borsh.Serialize(env.Manifest)
+	manifestBytes, err := reserializeManifest(env.Manifest)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to serialize manifest: %w", err)
+		return nil, nil, nil, err
 	}
 
 	return &env.Manifest, manifestBytes, envelopeBytes, nil
@@ -52,9 +62,9 @@ func DecodeManifestFromFile(filePath string) (*Manifest, []byte, []byte, error) 
 	}
 
 	// If we successfully parsed as envelope, re-serialize just the manifest portion
-	manifestBytes, err := borsh.Serialize(env.Manifest)
+	manifestBytes, err := reserializeManifest(env.Manifest)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to serialize manifest: %w", err)
+		return nil, nil, nil, err
 	}
 
 	return &env.Manifest, manifestBytes, envelopeBytes, nil
@@ -109,9 +119,9 @@ func DecodeManifestEnvelopeFromFile(filePath string) (*ManifestEnvelope, *Manife
 	}
 
 	// Re-serialize just the manifest portion for hashing
-	manifestBytes, err := borsh.Serialize(env.Manifest)
+	manifestBytes, err := reserializeManifest(env.Manifest)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to serialize manifest: %w", err)
+		return nil, nil, nil, nil, err
 	}
 
 	return &env, &env.Manifest, manifestBytes, envelopeBytes, nil
@@ -132,9 +142,9 @@ func DecodeManifestEnvelopeFromBase64(manifestB64 string) (*ManifestEnvelope, *M
 	}
 
 	// Re-serialize just the manifest portion for hashing
-	manifestBytes, err := borsh.Serialize(env.Manifest)
+	manifestBytes, err := reserializeManifest(env.Manifest)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to serialize manifest: %w", err)
+		return nil, nil, nil, nil, err
 	}
 
 	return &env, &env.Manifest, manifestBytes, envelopeBytes, nil

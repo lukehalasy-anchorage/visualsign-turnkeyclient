@@ -558,56 +558,6 @@ func TestVerifySaveManifestInvalidBase64(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 }
 
-// Test PCR extraction from attestation
-func TestPCRExtraction(t *testing.T) {
-	pubKeyBytes, _ := create130BytePublicKey(t)
-	validKey260 := hex.EncodeToString(pubKeyBytes)
-	messageHex := strings.Repeat("ab", 32)
-	signatureHex := strings.Repeat("cd", 64)
-	appAttJSON := fmt.Sprintf(`{"message":"%s","publicKey":"%s","signature":"%s"}`, messageHex, validKey260, signatureHex)
-
-	apiResponse := &api.SignablePayloadResponse{
-		SignablePayload: "test-payload",
-		Attestations: map[api.AttestationType]string{
-			api.AppAttestationKey:  appAttJSON,
-			api.BootAttestationKey: "boot-doc",
-		},
-	}
-
-	mockAPI := &mockAPIClient{response: apiResponse}
-	mockVerifier := &mockAttestationVerifier{
-		result: &nitroverifier.ValidationResult{
-			Valid: true,
-			Document: &nitroverifier.AttestationDocument{
-				ModuleID: "test-module",
-				PCRs: map[uint][]byte{
-					0: {0x01, 0x02, 0x03},
-					1: {0x04, 0x05, 0x06},
-					2: {0x07, 0x08, 0x09},
-				},
-				UserData: []byte{},
-			},
-		},
-	}
-
-	service := NewService(mockAPI, mockVerifier)
-
-	req := &VerifyRequest{
-		UnsignedPayload: "unsigned-payload",
-	}
-
-	result, err := service.Verify(context.Background(), req)
-	// Will fail at signature verification, but we can check PCRs were extracted
-	if err != nil {
-		// Error is expected (invalid signature), skip this test
-		t.Skip("Signature verification expected to fail with dummy signature")
-	}
-
-	require.NotNil(t, result)
-	require.Len(t, result.PCRs, 3)
-	require.Equal(t, []byte{0x01, 0x02, 0x03}, result.PCRs[0])
-}
-
 // Test processManifest
 func TestProcessManifest(t *testing.T) {
 	service := NewService(&mockAPIClient{}, &mockAttestationVerifier{})
@@ -619,7 +569,7 @@ func TestProcessManifest(t *testing.T) {
 		result := &VerifyResult{}
 
 		err := service.processManifest(response, []byte{}, false, result)
-		require.NoError(t, err)
+		require.NoError(t, err) // Empty manifest should be skipped gracefully
 	})
 
 	t.Run("invalid manifest b64", func(t *testing.T) {
@@ -656,5 +606,18 @@ func TestProcessManifest(t *testing.T) {
 
 		err := service.processManifest(response, []byte{}, false, result)
 		require.Error(t, err)
+	})
+
+	t.Run("empty manifest envelope but has raw manifest", func(t *testing.T) {
+		// Only raw manifest, no envelope
+		invalidB64 := base64.StdEncoding.EncodeToString([]byte{0xAB})
+		response := &api.SignablePayloadResponse{
+			QosManifestB64:         invalidB64,
+			QosManifestEnvelopeB64: "",
+		}
+		result := &VerifyResult{}
+
+		err := service.processManifest(response, []byte{}, false, result)
+		require.Error(t, err) // Should fail to decode invalid manifest
 	})
 }

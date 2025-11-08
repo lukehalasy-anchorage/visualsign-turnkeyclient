@@ -257,6 +257,11 @@ func (s *Service) verifyUserData(userData []byte, expectedHashHex string) error 
 func (s *Service) processManifest(response *api.SignablePayloadResponse, userData []byte,
 	allowMismatch bool, result *VerifyResult) error {
 
+	// Skip if no manifest provided
+	if response.QosManifestB64 == "" && response.QosManifestEnvelopeB64 == "" {
+		return nil
+	}
+
 	// Compute raw manifest hash before attempting full deserialization
 	// This helps debug even if the full manifest parsing fails
 	rawManifestBytes, _ := base64.StdEncoding.DecodeString(response.QosManifestB64)
