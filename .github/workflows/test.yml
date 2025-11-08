@@ -58,10 +58,10 @@ jobs:
 
       - name: Check coverage threshold
         run: |
-          COVERAGE=$(grep "coverage:" test-output.txt | grep "of statements" | tail -1 | awk '{print $2}' | sed 's/%//')
+          COVERAGE=$(grep "coverage:" test-output.txt | grep "of statements" | head -1 | awk '{print $2}' | sed 's/%//')
           echo "Code coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
-            echo "ERROR: Code coverage ${COVERAGE}% is below minimum 60%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "ERROR: Code coverage ${COVERAGE}% is below minimum 80%"
             exit 1
           fi
           echo "✓ Code coverage meets minimum threshold"

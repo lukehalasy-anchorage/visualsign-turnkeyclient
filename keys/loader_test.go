@@ -157,7 +157,7 @@ func TestKeyDerivation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify that X,Y are on the curve
-	isOnCurve := key.PrivateKey.Curve.IsOnCurve(key.PrivateKey.X, key.PrivateKey.Y)
+	isOnCurve := elliptic.P256().IsOnCurve(key.PrivateKey.X, key.PrivateKey.Y)
 	assert.True(t, isOnCurve, "Public key point should be on the curve")
 
 	// Verify the public key can be reconstructed
@@ -210,8 +210,11 @@ func TestLoadAPIKeyFromFileIntegration(t *testing.T) {
 
 		// Temporarily override HOME
 		oldHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)
-		defer os.Setenv("HOME", oldHome)
+		err = os.Setenv("HOME", tmpDir)
+		require.NoError(t, err)
+		defer func() {
+			_ = os.Setenv("HOME", oldHome)
+		}()
 
 		// Test LoadAPIKeyFromFile
 		key, err := LoadAPIKeyFromFile("test-key")

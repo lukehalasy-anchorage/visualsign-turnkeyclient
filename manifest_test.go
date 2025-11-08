@@ -391,3 +391,43 @@ func BenchmarkDecodeRawManifestFromFile(b *testing.B) {
 		_, _, _ = DecodeRawManifestFromFile("testdata/manifest.bin")
 	}
 }
+
+// Test root package wrapper functions
+
+func TestDecodeManifestFromBase64Wrapper(t *testing.T) {
+	t.Run("invalid base64", func(t *testing.T) {
+		_, _, _, err := DecodeManifestFromBase64("not-valid-base64!")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to decode base64")
+	})
+
+	t.Run("invalid borsh", func(t *testing.T) {
+		invalidB64 := base64.StdEncoding.EncodeToString([]byte{0xFF, 0xFF})
+		_, _, _, err := DecodeManifestFromBase64(invalidB64)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to deserialize manifest envelope")
+	})
+}
+
+func TestDecodeManifestEnvelopeFromFileWrapper(t *testing.T) {
+	t.Run("non-existent file", func(t *testing.T) {
+		_, _, _, _, err := DecodeManifestEnvelopeFromFile("does-not-exist.bin")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to read file")
+	})
+}
+
+func TestDecodeManifestEnvelopeFromBase64Wrapper(t *testing.T) {
+	t.Run("invalid base64", func(t *testing.T) {
+		_, _, _, _, err := DecodeManifestEnvelopeFromBase64("!!!invalid!!!")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to decode base64")
+	})
+
+	t.Run("invalid envelope", func(t *testing.T) {
+		invalidB64 := base64.StdEncoding.EncodeToString([]byte{0xFF, 0xFE})
+		_, _, _, _, err := DecodeManifestEnvelopeFromBase64(invalidB64)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "failed to deserialize manifest envelope")
+	})
+}

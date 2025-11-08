@@ -1,0 +1,64 @@
+package cmd
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v3"
+)
+
+func TestDecodeCommand(t *testing.T) {
+	cmd := DecodeCommand()
+
+	require.NotNil(t, cmd)
+	require.Equal(t, "decode-manifest", cmd.Name)
+	require.Len(t, cmd.Commands, 2)
+}
+
+func TestDecodeRawManifestCommand(t *testing.T) {
+	cmd := decodeRawManifestCommand()
+
+	require.NotNil(t, cmd)
+	require.Equal(t, "raw", cmd.Name)
+	require.Len(t, cmd.Flags, 3)
+
+	// Verify flags
+	var hasFile, hasBase64, hasJSON bool
+	for _, flag := range cmd.Flags {
+		switch f := flag.(type) {
+		case *cli.StringFlag:
+			if f.Name == "file" {
+				hasFile = true
+			}
+			if f.Name == "base64" {
+				hasBase64 = true
+			}
+		case *cli.BoolFlag:
+			if f.Name == "json" {
+				hasJSON = true
+			}
+		}
+	}
+
+	require.True(t, hasFile)
+	require.True(t, hasBase64)
+	require.True(t, hasJSON)
+}
+
+func TestDecodeManifestEnvelopeCommand(t *testing.T) {
+	cmd := decodeManifestEnvelopeCommand()
+
+	require.NotNil(t, cmd)
+	require.Equal(t, "envelope", cmd.Name)
+
+	// Check flags exist
+	require.Len(t, cmd.Flags, 3)
+}
+
+func TestDecodeRawManifestFlags(t *testing.T) {
+	cmd := decodeRawManifestCommand()
+
+	require.NotNil(t, cmd)
+	require.Equal(t, "raw", cmd.Name)
+	require.Len(t, cmd.Flags, 3) // --file, --base64, --json
+}

@@ -47,8 +47,8 @@ func TestSignWithECDSA(t *testing.T) {
 
 	t.Run("nil key panics", func(t *testing.T) {
 		// SignWithECDSA doesn't handle nil key gracefully, it will panic
-		assert.Panics(t, func() {
-			SignWithECDSA(nil, data)
+		require.Panics(t, func() {
+			_, _ = SignWithECDSA(nil, data)
 		})
 	})
 
@@ -139,8 +139,8 @@ func TestVerifyECDSASignature(t *testing.T) {
 	})
 
 	t.Run("nil public key panics", func(t *testing.T) {
-		assert.Panics(t, func() {
-			VerifyECDSASignature(nil, data, validSig)
+		require.Panics(t, func() {
+			_ = VerifyECDSASignature(nil, data, validSig)
 		})
 	})
 }
