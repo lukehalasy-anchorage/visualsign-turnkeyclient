@@ -60,7 +60,7 @@ func VerifyCommand() *cli.Command {
 			&cli.BoolFlag{
 				Name:  "allow-manifest-reserialization-mismatch",
 				Usage: "Continue verification even if manifest reserialization produces different hash than UserData (show warning instead of aborting)",
-				Value: true, // TODO: Default to true for now - align manifest format with API response
+				Value: true, // KNOWN LIMITATION: Default is true due to manifest format mismatch with API response. Verification will continue even if manifest reserialization produces a different hash than UserData. See README for details.
 			},
 			&cli.BoolFlag{
 				Name:  "debug",
