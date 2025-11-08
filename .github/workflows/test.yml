@@ -25,7 +25,7 @@ jobs:
           cache: true
 
       - name: Configure git for private repos
-        run: git config --global url."https://${{ github.token }}@github.com/".insteadOf "https://github.com/"
+        run: git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Download dependencies
         run: go mod download
@@ -84,7 +84,7 @@ jobs:
           cache: true
 
       - name: Configure git for private repos
-        run: git config --global url."https://${{ github.token }}@github.com/".insteadOf "https://github.com/"
+        run: git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Build
         run: CGO_ENABLED=0 go build -o turnkey-client .
@@ -113,7 +113,7 @@ jobs:
           cache: true
 
       - name: Configure git for private repos
-        run: git config --global url."https://${{ github.token }}@github.com/".insteadOf "https://github.com/"
+        run: git config --global url."https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
       - name: Install golangci-lint
         run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
