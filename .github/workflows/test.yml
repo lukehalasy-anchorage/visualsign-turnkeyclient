@@ -31,10 +31,11 @@ jobs:
         run: go mod download
 
       - name: Run tests with coverage
-        run: go test -v -race -coverprofile=coverage.out ./...
-
-      - name: Display coverage summary
-        run: go tool cover -func=coverage.out | tail -1
+        run: |
+          go test -v -race -coverprofile=coverage.out ./... 2>&1 | tee test-output.txt
+          echo "---"
+          echo "Coverage Summary:"
+          grep "coverage:" test-output.txt | grep "of statements" | tail -1
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -57,7 +58,7 @@ jobs:
 
       - name: Check coverage threshold
         run: |
-          COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
+          COVERAGE=$(grep "coverage:" test-output.txt | grep "of statements" | tail -1 | awk '{print $2}' | sed 's/%//')
           echo "Code coverage: ${COVERAGE}%"
           if (( $(echo "$COVERAGE < 60" | bc -l) )); then
             echo "ERROR: Code coverage ${COVERAGE}% is below minimum 60%"
