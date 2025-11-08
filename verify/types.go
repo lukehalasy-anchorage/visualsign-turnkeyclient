@@ -84,7 +84,7 @@ type ManifestSerializationResult struct {
 	RawManifestB64           string // Base64-encoded manifest for debugging
 	EnvelopeB64              string // Base64-encoded envelope for debugging
 	Matches                  bool
-	ResserializationNeeded   bool
+	ReserializationNeeded    bool
 	Error                    string
 }
 

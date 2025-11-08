@@ -148,14 +148,14 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Display manifest details if available
-	if result.Manifest != nil || result.ManifestReserialization.ResserializationNeeded {
+	if result.Manifest != nil || result.ManifestReserialization.ReserializationNeeded {
 		fmt.Fprintf(os.Stderr, "\n=== QoS Manifest Decoding ===\n")
 		if result.Manifest != nil {
 			fmt.Fprintf(os.Stderr, "✓ Manifest decoded successfully\n")
 		}
 		if result.ManifestReserialization.Matches {
 			fmt.Fprintf(os.Stderr, "✓ Raw manifest hash matches UserData in attestation\n")
-		} else if result.ManifestReserialization.ResserializationNeeded {
+		} else if result.ManifestReserialization.ReserializationNeeded {
 			if result.ManifestReserialization.Error != "" {
 				fmt.Fprintf(os.Stderr, "ℹ️  WARNING: Manifest parsing error (continuing due to --allow-manifest-reserialization-mismatch)\n")
 				fmt.Fprintf(os.Stderr, "  Error: %s\n", result.ManifestReserialization.Error)

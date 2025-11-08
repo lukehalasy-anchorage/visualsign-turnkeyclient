@@ -165,7 +165,7 @@ func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult
 			if req.AllowManifestReserializationMismatch {
 				// Store the error in manifest reserialization result for display
 				result.ManifestReserialization.Error = err.Error()
-				result.ManifestReserialization.ResserializationNeeded = true
+				result.ManifestReserialization.ReserializationNeeded = true
 			} else {
 				return nil, err
 			}
@@ -327,7 +327,7 @@ func (s *Service) processManifest(response *api.SignablePayloadResponse, userDat
 		if rawManifestMatches || envelopeMatches {
 			serializationResult.Matches = true
 		} else {
-			serializationResult.ResserializationNeeded = true
+			serializationResult.ReserializationNeeded = true
 			if !allowMismatch {
 				mismatchMsg := fmt.Sprintf(
 					"manifest hash mismatch: boot-time %s != raw-manifest %s",
