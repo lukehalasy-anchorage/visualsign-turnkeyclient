@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/anchorageoss/visualsign-turnkeyclient/testdata"
 	"github.com/near/borsh-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -174,25 +175,25 @@ func TestDecodeManifestEnvelopeFromBase64(t *testing.T) {
 	})
 }
 
-// Test with actual testdata file
+// Test with actual embedded testdata
 func TestDecodeActualManifest(t *testing.T) {
-	testdataDir := "../testdata"
-	manifestPath := filepath.Join(testdataDir, "manifest.bin")
-
-	// Skip if testdata doesn't exist
-	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
-		t.Skip("testdata/manifest.bin not found")
-	}
+	// Use embedded manifest data from central testdata package
+	manifestBytes := testdata.ManifestBin
+	manifestB64 := base64.StdEncoding.EncodeToString(manifestBytes)
 
 	// This should work with either raw manifest or envelope
-	manifest, manifestBytes, _, err := DecodeManifestFromFile(manifestPath)
+	manifest, decodedBytes, err := DecodeRawManifestFromBase64(manifestB64)
 	assert.NoError(t, err)
 	assert.NotNil(t, manifest)
-	assert.NotEmpty(t, manifestBytes)
+	assert.NotEmpty(t, decodedBytes)
 
 	// Test hash computation
 	hash := ComputeHash(manifestBytes)
 	assert.Len(t, hash, 64) // SHA256 produces 64 hex chars
+
+	// Verify reserialized hash matches original
+	reserializedHash := ComputeHash(decodedBytes)
+	assert.Equal(t, hash, reserializedHash, "reserialized manifest should have same hash")
 }
 
 // TestDecodeManifestSuccess tests the happy path with synthetic data

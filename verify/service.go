@@ -156,19 +156,9 @@ func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult
 	result.Valid = true
 
 	// Step 5: Decode QoS Manifest if available
-	// TODO: Manifest reserialization currently produces different hash than UserData.
-	// This is expected behavior for now - the manifest format needs alignment with API response.
-	// See: https://github.com/tkhq/turnkey-sdk-go/issues/XXX
 	if response.QosManifestB64 != "" {
-		err := s.processManifest(response, validationResult.Document.UserData, req.AllowManifestReserializationMismatch, result)
-		if err != nil {
-			if req.AllowManifestReserializationMismatch {
-				// Store the error in manifest reserialization result for display
-				result.ManifestReserialization.Error = err.Error()
-				result.ManifestReserialization.ReserializationNeeded = true
-			} else {
-				return nil, err
-			}
+		if err := s.processManifest(response, validationResult.Document.UserData, result); err != nil {
+			return nil, err
 		}
 	}
 
@@ -255,7 +245,7 @@ func (s *Service) verifyUserData(userData []byte, expectedHashHex string) error 
 
 // processManifest decodes and processes the QoS manifest
 func (s *Service) processManifest(response *api.SignablePayloadResponse, userData []byte,
-	allowMismatch bool, result *VerifyResult) error {
+	result *VerifyResult) error {
 
 	// Skip if no manifest provided
 	if response.QosManifestB64 == "" && response.QosManifestEnvelopeB64 == "" {
@@ -328,16 +318,14 @@ func (s *Service) processManifest(response *api.SignablePayloadResponse, userDat
 			serializationResult.Matches = true
 		} else {
 			serializationResult.ReserializationNeeded = true
-			if !allowMismatch {
-				mismatchMsg := fmt.Sprintf(
-					"manifest hash mismatch: boot-time %s != raw-manifest %s",
-					userDataHex, rawManifestHash)
-				if serializationResult.EnvelopeHash != "" {
-					mismatchMsg += fmt.Sprintf(" != envelope %s", serializationResult.EnvelopeHash)
-				}
-				serializationResult.Error = mismatchMsg
-				return errors.New(serializationResult.Error)
+			mismatchMsg := fmt.Sprintf(
+				"manifest hash mismatch: boot-time %s != raw-manifest %s",
+				userDataHex, rawManifestHash)
+			if serializationResult.EnvelopeHash != "" {
+				mismatchMsg += fmt.Sprintf(" != envelope %s", serializationResult.EnvelopeHash)
 			}
+			serializationResult.Error = mismatchMsg
+			return errors.New(serializationResult.Error)
 		}
 
 		// Store result hashes for output

@@ -15,6 +15,8 @@ import (
 
 	nitroverifier "github.com/anchorageoss/awsnitroverifier"
 	"github.com/anchorageoss/visualsign-turnkeyclient/api"
+	"github.com/anchorageoss/visualsign-turnkeyclient/manifest"
+	"github.com/anchorageoss/visualsign-turnkeyclient/testdata"
 	"github.com/stretchr/testify/require"
 )
 
@@ -568,7 +570,7 @@ func TestProcessManifest(t *testing.T) {
 		}
 		result := &VerifyResult{}
 
-		err := service.processManifest(response, []byte{}, false, result)
+		err := service.processManifest(response, []byte{}, result)
 		require.NoError(t, err) // Empty manifest should be skipped gracefully
 	})
 
@@ -578,7 +580,7 @@ func TestProcessManifest(t *testing.T) {
 		}
 		result := &VerifyResult{}
 
-		err := service.processManifest(response, []byte{}, false, result)
+		err := service.processManifest(response, []byte{}, result)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to decode QoS manifest")
 	})
@@ -590,7 +592,7 @@ func TestProcessManifest(t *testing.T) {
 		}
 		result := &VerifyResult{}
 
-		err := service.processManifest(response, []byte{}, false, result)
+		err := service.processManifest(response, []byte{}, result)
 		require.Error(t, err)
 	})
 
@@ -604,7 +606,7 @@ func TestProcessManifest(t *testing.T) {
 		}
 		result := &VerifyResult{}
 
-		err := service.processManifest(response, []byte{}, false, result)
+		err := service.processManifest(response, []byte{}, result)
 		require.Error(t, err)
 	})
 
@@ -617,7 +619,39 @@ func TestProcessManifest(t *testing.T) {
 		}
 		result := &VerifyResult{}
 
-		err := service.processManifest(response, []byte{}, false, result)
+		err := service.processManifest(response, []byte{}, result)
 		require.Error(t, err) // Should fail to decode invalid manifest
+	})
+
+	t.Run("real manifest from embedded testdata", func(t *testing.T) {
+		// Use embedded manifest data from central testdata package
+		manifestBytes := testdata.ManifestBin
+
+		// Encode to base64
+		manifestB64 := base64.StdEncoding.EncodeToString(manifestBytes)
+		manifestHash := manifest.ComputeHash(manifestBytes)
+		userData, err := hex.DecodeString(manifestHash)
+		require.NoError(t, err)
+
+		response := &api.SignablePayloadResponse{
+			QosManifestB64: manifestB64,
+		}
+
+		result := &VerifyResult{}
+
+		// This should succeed and the hashes should match
+		err = service.processManifest(response, userData, result)
+		require.NoError(t, err)
+		require.NotNil(t, result.Manifest)
+		require.True(t, result.ManifestReserialization.Matches)
+		require.Equal(t, manifestHash, result.QosManifestHash)
+
+		// Verify manifest was decoded properly
+		require.NotEmpty(t, result.Manifest.Namespace.Name)
+		require.NotNil(t, result.Manifest.Pivot)
+
+		// Additional validation: ensure reserialized hash matches original
+		require.Equal(t, manifestHash, result.ManifestReserialization.RawManifestHash)
+		require.Equal(t, manifestHash, result.ManifestReserialization.ReserializedManifestHash)
 	})
 }

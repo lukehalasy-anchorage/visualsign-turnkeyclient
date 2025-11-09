@@ -58,11 +58,6 @@ func VerifyCommand() *cli.Command {
 				Value: "CHAIN_SOLANA",
 			},
 			&cli.BoolFlag{
-				Name:  "allow-manifest-reserialization-mismatch",
-				Usage: "Continue verification even if manifest reserialization produces different hash than UserData (show warning instead of aborting)",
-				Value: true, // KNOWN LIMITATION: Default is true due to manifest format mismatch with API response. Verification will continue even if manifest reserialization produces a different hash than UserData. See README for details.
-			},
-			&cli.BoolFlag{
 				Name:  "debug",
 				Usage: "Enable debug output (attestation document, PCR values, manifest details)",
 			},
@@ -81,7 +76,6 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 	pivotBinaryHashHex := cmd.String("pivot-binary-hash-hex")
 	saveManifestPath := cmd.String("save-qos-manifest")
 	chain := cmd.String("chain")
-	allowMismatch := cmd.Bool("allow-manifest-reserialization-mismatch")
 	debug := cmd.Bool("debug")
 
 	// Create API client
@@ -102,12 +96,11 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 
 	// Perform verification
 	result, err := service.Verify(ctx, &verify.VerifyRequest{
-		UnsignedPayload:                      unsignedPayload,
-		QosManifestHex:                       qosManifestHex,
-		PivotBinaryHashHex:                   pivotBinaryHashHex,
-		SaveManifestPath:                     saveManifestPath,
-		Chain:                                chain,
-		AllowManifestReserializationMismatch: allowMismatch,
+		UnsignedPayload:    unsignedPayload,
+		QosManifestHex:     qosManifestHex,
+		PivotBinaryHashHex: pivotBinaryHashHex,
+		SaveManifestPath:   saveManifestPath,
+		Chain:              chain,
 	})
 	if err != nil {
 		return fmt.Errorf("verification failed: %w", err)
@@ -157,10 +150,10 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 			fmt.Fprintf(os.Stderr, "✓ Raw manifest hash matches UserData in attestation\n")
 		} else if result.ManifestReserialization.ReserializationNeeded {
 			if result.ManifestReserialization.Error != "" {
-				fmt.Fprintf(os.Stderr, "ℹ️  WARNING: Manifest parsing error (continuing due to --allow-manifest-reserialization-mismatch)\n")
+				fmt.Fprintf(os.Stderr, "⚠️  WARNING: Manifest parsing error\n")
 				fmt.Fprintf(os.Stderr, "  Error: %s\n", result.ManifestReserialization.Error)
 			} else {
-				fmt.Fprintf(os.Stderr, "ℹ️  INFO: Manifest reserialization mismatch (continuing due to --allow-manifest-reserialization-mismatch)\n")
+				fmt.Fprintf(os.Stderr, "ℹ️  INFO: Manifest reserialization mismatch detected\n")
 			}
 		}
 

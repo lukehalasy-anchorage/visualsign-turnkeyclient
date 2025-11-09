@@ -35,7 +35,6 @@
 //   - QosManifestHex: Compare manifest hash (optional)
 //   - PivotBinaryHashHex: Verify binary hash (optional)
 //   - SaveManifestPath: Save manifest to file (optional)
-//   - AllowManifestReserializationMismatch: Skip borsh re-serialization check
 package verify
 
 import (
@@ -46,12 +45,11 @@ import (
 
 // VerifyRequest represents the parameters for verification
 type VerifyRequest struct {
-	UnsignedPayload                      string
-	QosManifestHex                       string
-	PivotBinaryHashHex                   string
-	SaveManifestPath                     string
-	Chain                                string
-	AllowManifestReserializationMismatch bool
+	UnsignedPayload    string
+	QosManifestHex     string
+	PivotBinaryHashHex string
+	SaveManifestPath   string
+	Chain              string
 }
 
 // VerifyResult represents the result of verification

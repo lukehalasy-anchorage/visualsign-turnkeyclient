@@ -76,34 +76,24 @@ func (f *Formatter) FormatPCRValues(pcrs map[uint][]byte, title string, indent s
 
 	// Display all-zero PCRs as a range if there are any
 	if len(allZeroPCRs) > 0 {
-		if len(allZeroPCRs) == 1 {
-			sb.WriteString(fmt.Sprintf("%s    PCR[%d]: 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 (all zeros)\n", indent, allZeroPCRs[0]))
-		} else {
-			// Find consecutive ranges
-			start := allZeroPCRs[0]
-			end := allZeroPCRs[0]
+		zeroHash := "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
-			for i := 1; i < len(allZeroPCRs); i++ {
-				if allZeroPCRs[i] == end+1 {
-					end = allZeroPCRs[i]
-				} else {
-					// Print current range
-					if start == end {
-						sb.WriteString(fmt.Sprintf("%s    PCR[%d]: 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 (all zeros)\n", indent, start))
-					} else {
-						sb.WriteString(fmt.Sprintf("%s    PCR[%d-%d]: 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 (all zeros)\n", indent, start, end))
-					}
-					start = allZeroPCRs[i]
-					end = allZeroPCRs[i]
-				}
+		for i := 0; i < len(allZeroPCRs); {
+			start := allZeroPCRs[i]
+			end := start
+
+			// Find end of consecutive range
+			for i+1 < len(allZeroPCRs) && allZeroPCRs[i+1] == end+1 {
+				i++
+				end = allZeroPCRs[i]
 			}
 
-			// Print final range
 			if start == end {
-				sb.WriteString(fmt.Sprintf("%s    PCR[%d]: 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 (all zeros)\n", indent, start))
+				sb.WriteString(fmt.Sprintf("%s    PCR[%d]: %s (all zeros)\n", indent, start, zeroHash))
 			} else {
-				sb.WriteString(fmt.Sprintf("%s    PCR[%d-%d]: 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 (all zeros)\n", indent, start, end))
+				sb.WriteString(fmt.Sprintf("%s    PCR[%d-%d]: %s (all zeros)\n", indent, start, end, zeroHash))
 			}
+			i++
 		}
 	}
 
