@@ -1,114 +1,21 @@
-package main
+package manifest
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"os"
 
 	"github.com/near/borsh-go"
 )
 
-// RestartPolicy enum matching the Rust definition
-type RestartPolicy uint8
-
-const (
-	RestartPolicyNever RestartPolicy = iota
-	RestartPolicyAlways
-)
-
-// MarshalJSON converts RestartPolicy to JSON string format matching qos_client
-func (r RestartPolicy) MarshalJSON() ([]byte, error) {
-	switch r {
-	case RestartPolicyNever:
-		return []byte(`"Never"`), nil
-	case RestartPolicyAlways:
-		return []byte(`"Always"`), nil
-	default:
-		return []byte(fmt.Sprintf(`"Unknown(%d)"`, uint8(r))), nil
+// reserializeManifest re-encodes a Manifest struct to get its raw bytes
+// This is used to compute hashes consistently across envelope and raw manifest formats
+func reserializeManifest(m Manifest) ([]byte, error) {
+	manifestBytes, err := borsh.Serialize(m)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize manifest: %w", err)
 	}
-}
-
-// String converts RestartPolicy to string format
-func (r RestartPolicy) String() string {
-	switch r {
-	case RestartPolicyNever:
-		return "Never"
-	case RestartPolicyAlways:
-		return "Always"
-	default:
-		return fmt.Sprintf("Unknown(%d)", uint8(r))
-	}
-}
-
-type Hash256 [32]byte
-
-type Namespace struct {
-	Name      string `borsh:"name"`
-	Nonce     uint32 `borsh:"nonce"`
-	QuorumKey []byte `borsh:"quorum_key"`
-}
-
-type NitroConfig struct {
-	Pcr0               []byte `borsh:"pcr0"`
-	Pcr1               []byte `borsh:"pcr1"`
-	Pcr2               []byte `borsh:"pcr2"`
-	Pcr3               []byte `borsh:"pcr3"`
-	AwsRootCertificate []byte `borsh:"aws_root_certificate"`
-	QosCommit          string `borsh:"qos_commit"`
-}
-
-type PivotConfig struct {
-	Hash    Hash256       `borsh:"hash"`    // fixed 32 bytes
-	Restart RestartPolicy `borsh:"restart"` // enum as u8
-	Args    []string      `borsh:"args"`
-}
-
-type QuorumMember struct {
-	Alias  string `borsh:"alias"`
-	PubKey []byte `borsh:"pub_key"`
-}
-
-type ManifestSet struct {
-	Threshold uint32         `borsh:"threshold"`
-	Members   []QuorumMember `borsh:"members"`
-}
-
-type ShareSet struct {
-	Threshold uint32         `borsh:"threshold"`
-	Members   []QuorumMember `borsh:"members"`
-}
-
-type MemberPubKey struct {
-	PubKey []byte `borsh:"pub_key"`
-}
-
-type PatchSet struct {
-	Threshold uint32         `borsh:"threshold"`
-	Members   []MemberPubKey `borsh:"members"`
-}
-
-type Manifest struct {
-	Namespace   Namespace   `borsh:"namespace"`
-	Pivot       PivotConfig `borsh:"pivot"`
-	ManifestSet ManifestSet `borsh:"manifest_set"`
-	ShareSet    ShareSet    `borsh:"share_set"`
-	Enclave     NitroConfig `borsh:"enclave"`
-	PatchSet    PatchSet    `borsh:"patch_set"`
-}
-
-// Approval structures for manifest envelope
-type Approval struct {
-	Signature []byte       `borsh:"signature"`
-	Member    QuorumMember `borsh:"member"`
-}
-
-// ManifestEnvelope wraps the manifest with approval signatures
-type ManifestEnvelope struct {
-	Manifest             Manifest   `borsh:"manifest"`
-	ManifestSetApprovals []Approval `borsh:"manifest_set_approvals"`
-	ShareSetApprovals    []Approval `borsh:"share_set_approvals"`
+	return manifestBytes, nil
 }
 
 // DecodeManifestFromBase64 decodes a base64-encoded manifest envelope and returns the manifest and envelope bytes
@@ -126,9 +33,9 @@ func DecodeManifestFromBase64(manifestB64 string) (*Manifest, []byte, []byte, er
 	}
 
 	// Re-encode just the Manifest struct to get its raw bytes
-	manifestBytes, err := borsh.Serialize(env.Manifest)
+	manifestBytes, err := reserializeManifest(env.Manifest)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to serialize manifest: %w", err)
+		return nil, nil, nil, err
 	}
 
 	return &env.Manifest, manifestBytes, envelopeBytes, nil
@@ -155,18 +62,12 @@ func DecodeManifestFromFile(filePath string) (*Manifest, []byte, []byte, error) 
 	}
 
 	// If we successfully parsed as envelope, re-serialize just the manifest portion
-	manifestBytes, err := borsh.Serialize(env.Manifest)
+	manifestBytes, err := reserializeManifest(env.Manifest)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to serialize manifest: %w", err)
+		return nil, nil, nil, err
 	}
 
 	return &env.Manifest, manifestBytes, envelopeBytes, nil
-}
-
-// ComputeManifestHash computes SHA256 hash of manifest bytes
-func ComputeManifestHash(manifestBytes []byte) string {
-	sum := sha256.Sum256(manifestBytes)
-	return hex.EncodeToString(sum[:])
 }
 
 // DecodeRawManifestFromFile decodes a raw manifest (not envelope) from a binary file
@@ -218,9 +119,9 @@ func DecodeManifestEnvelopeFromFile(filePath string) (*ManifestEnvelope, *Manife
 	}
 
 	// Re-serialize just the manifest portion for hashing
-	manifestBytes, err := borsh.Serialize(env.Manifest)
+	manifestBytes, err := reserializeManifest(env.Manifest)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to serialize manifest: %w", err)
+		return nil, nil, nil, nil, err
 	}
 
 	return &env, &env.Manifest, manifestBytes, envelopeBytes, nil
@@ -241,9 +142,9 @@ func DecodeManifestEnvelopeFromBase64(manifestB64 string) (*ManifestEnvelope, *M
 	}
 
 	// Re-serialize just the manifest portion for hashing
-	manifestBytes, err := borsh.Serialize(env.Manifest)
+	manifestBytes, err := reserializeManifest(env.Manifest)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to serialize manifest: %w", err)
+		return nil, nil, nil, nil, err
 	}
 
 	return &env, &env.Manifest, manifestBytes, envelopeBytes, nil

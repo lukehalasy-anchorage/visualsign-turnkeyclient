@@ -30,3 +30,11 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+
+# claude really likes to make binaries in top level
+visualsign-turnkeyclient
+bin/*
+bin/turnkey-client
+
+test-output.txt

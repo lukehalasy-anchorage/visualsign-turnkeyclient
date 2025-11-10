@@ -1,0 +1,139 @@
+// Package manifest provides types and parsing functions for QoS (QuorumOS) manifests.
+//
+// Manifests are Borsh-encoded security policies for AWS Nitro Enclaves running QuorumOS.
+// They define the enclave's configuration, including binary hashes, PCR values, and
+// quorum members authorized to update the manifest.
+//
+// # Manifest Structure
+//
+// A manifest contains:
+//   - Namespace: Organization and application identifier
+//   - Pivot: Binary hash and restart policy
+//   - ManifestSet: Quorum members who can update the manifest
+//   - ShareSet: Members holding key shares
+//   - Enclave: Expected PCR values for attestation verification
+//   - PatchSet: Members authorized to apply patches
+//
+// # Parsing
+//
+// Decode manifests using DecodeRawManifestFromBase64 or DecodeManifestEnvelopeFromFile:
+//
+//	manifest, manifestBytes, err := manifest.DecodeRawManifestFromBase64(base64String)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+// Compute manifest hash and compare against attestation UserData:
+//
+//	hash := manifest.ComputeHash(manifestBytes)
+//
+// # Validation
+//
+// The manifest hash in the attestation's UserData field proves that the enclave is
+// running the correct QuorumOS configuration. See README for detailed validation steps.
+package manifest
+
+import (
+	"fmt"
+)
+
+// RestartPolicy enum matching the Rust definition
+type RestartPolicy uint8
+
+const (
+	RestartPolicyNever RestartPolicy = iota
+	RestartPolicyAlways
+)
+
+// MarshalJSON converts RestartPolicy to JSON string format matching qos_client
+func (r RestartPolicy) MarshalJSON() ([]byte, error) {
+	switch r {
+	case RestartPolicyNever:
+		return []byte(`"Never"`), nil
+	case RestartPolicyAlways:
+		return []byte(`"Always"`), nil
+	default:
+		return []byte(fmt.Sprintf(`"Unknown(%d)"`, uint8(r))), nil
+	}
+}
+
+// String converts RestartPolicy to string format
+func (r RestartPolicy) String() string {
+	switch r {
+	case RestartPolicyNever:
+		return "Never"
+	case RestartPolicyAlways:
+		return "Always"
+	default:
+		return fmt.Sprintf("Unknown(%d)", uint8(r))
+	}
+}
+
+type Hash256 [32]byte
+
+type Namespace struct {
+	Name      string `borsh:"name"`
+	Nonce     uint32 `borsh:"nonce"`
+	QuorumKey []byte `borsh:"quorum_key"`
+}
+
+type NitroConfig struct {
+	Pcr0               []byte `borsh:"pcr0"`
+	Pcr1               []byte `borsh:"pcr1"`
+	Pcr2               []byte `borsh:"pcr2"`
+	Pcr3               []byte `borsh:"pcr3"`
+	AwsRootCertificate []byte `borsh:"aws_root_certificate"`
+	QosCommit          string `borsh:"qos_commit"`
+}
+
+type PivotConfig struct {
+	Hash    Hash256       `borsh:"hash"`    // fixed 32 bytes
+	Restart RestartPolicy `borsh:"restart"` // enum as u8
+	Args    []string      `borsh:"args"`
+}
+
+type QuorumMember struct {
+	Alias  string `borsh:"alias"`
+	PubKey []byte `borsh:"pub_key"`
+}
+
+type ManifestSet struct {
+	Threshold uint32         `borsh:"threshold"`
+	Members   []QuorumMember `borsh:"members"`
+}
+
+type ShareSet struct {
+	Threshold uint32         `borsh:"threshold"`
+	Members   []QuorumMember `borsh:"members"`
+}
+
+type MemberPubKey struct {
+	PubKey []byte `borsh:"pub_key"`
+}
+
+type PatchSet struct {
+	Threshold uint32         `borsh:"threshold"`
+	Members   []MemberPubKey `borsh:"members"`
+}
+
+type Manifest struct {
+	Namespace   Namespace   `borsh:"namespace"`
+	Pivot       PivotConfig `borsh:"pivot"`
+	ManifestSet ManifestSet `borsh:"manifest_set"`
+	ShareSet    ShareSet    `borsh:"share_set"`
+	Enclave     NitroConfig `borsh:"enclave"`
+	PatchSet    PatchSet    `borsh:"patch_set"`
+}
+
+// Approval structures for manifest envelope
+type Approval struct {
+	Signature []byte       `borsh:"signature"`
+	Member    QuorumMember `borsh:"member"`
+}
+
+// ManifestEnvelope wraps the manifest with approval signatures
+type ManifestEnvelope struct {
+	Manifest             Manifest   `borsh:"manifest"`
+	ManifestSetApprovals []Approval `borsh:"manifest_set_approvals"`
+	ShareSetApprovals    []Approval `borsh:"share_set_approvals"`
+}
