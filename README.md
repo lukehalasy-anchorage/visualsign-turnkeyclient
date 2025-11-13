@@ -17,28 +17,7 @@ A Go client for Turnkey's Visualsign API that provides end-to-end verification o
 
 This project requires Go 1.25.0 or later.
 
-**Private Dependencies**: This project depends on `github.com/anchorageoss/awsnitroverifier`, which is a private repository. To build this project, you need:
-
-1. Access to the Anchorage GitHub organization
-2. Git credentials configured (SSH or HTTPS with personal access token)
-3. Set the `GOPRIVATE` environment variable:
-
-```bash
-export GOPRIVATE=github.com/anchorageoss/*
 ```
-
-You can make this permanent by adding it to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.):
-
-```bash
-echo 'export GOPRIVATE=github.com/anchorageoss/*' >> ~/.bashrc
-```
-
-### Build
-
-```bash
-# Set GOPRIVATE if not already set
-export GOPRIVATE=github.com/anchorageoss/*
-
 # Build binary to bin/ directory using Makefile
 make build
 

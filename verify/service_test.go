@@ -63,7 +63,7 @@ type mockAttestationVerifier struct {
 	err    error
 }
 
-func (m *mockAttestationVerifier) Validate(attestationDocument string) (*nitroverifier.ValidationResult, error) {
+func (m *mockAttestationVerifier) Validate(attestationDocument []byte) (*nitroverifier.ValidationResult, error) {
 	return m.result, m.err
 }
 
