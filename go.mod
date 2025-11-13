@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/anchorageoss/awsnitroverifier v0.0.0-20251113232817-6ca7c799321b
+	github.com/anchorageoss/awsnitroverifier v0.1.0
 	github.com/stretchr/testify v1.10.0
 )
 
