@@ -92,7 +92,6 @@ func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult
 		return nil, fmt.Errorf("failed to decode boot attestation document: %w", err)
 	}
 
-	fmt.Printf("Boot Attestation Document: %x\n", bootAttestationDoc)
 	// Step 2: Verify attestation document using awsnitroverifier
 	validationResult, err := s.attestationVerifier.Validate(bootAttestationDocBytes)
 	if err != nil {
