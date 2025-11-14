@@ -10,7 +10,7 @@ that transaction parsing occurs in a secure, isolated environment that a Hardwar
 VSP protects against:
 - Supply chain attacks on transaction parsing code (of course crates.io could get compromised)
 - Man-in-the-middle attacks on transaction data
-- Unauthorized modifications to the signing environment
+- Signing environment has the correct and authentic data to make decisions against (its worth noting that signing environment itself being safe is beyond scope of VisualSign)
 
 ### Incremental Integration Path
 
@@ -324,8 +324,7 @@ alidates that the specific visualsign-parser binary is running with the expected
 - ✅ All Level 1 & 2 guarantees
 - ✅ Verification of exact application binary (SHA256)
 - ✅ Protection against unauthorized manifest updates
-- ✅ Complete zero-trust verification
-- ✅ Ability to reproduce PCR values independently
+- ✅ Complete verification that expected code ran on genuine AWS Nitro instance
 
 ### Understanding the QoS Manifest
 
