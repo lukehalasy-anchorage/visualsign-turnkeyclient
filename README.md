@@ -1,5 +1,8 @@
 # Turnkey Visualsign Client
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/anchorageoss/visualsign-turnkeyclient)](https://goreportcard.com/report/github.com/anchorageoss/visualsign-turnkeyclient)
+[![Go Reference](https://pkg.go.dev/badge/github.com/anchorageoss/visualsign-turnkeyclient.svg)](https://pkg.go.dev/github.com/anchorageoss/visualsign-turnkeyclient)
+
 A Go client for Turnkey's Visualsign API that provides end-to-end verification of transactions executed in AWS Nitro enclaves, including QoS manifest decoding and validation.
 
 ## Features
