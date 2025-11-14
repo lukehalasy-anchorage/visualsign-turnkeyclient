@@ -38,3 +38,4 @@ bin/*
 bin/turnkey-client
 
 test-output.txt
+index.html

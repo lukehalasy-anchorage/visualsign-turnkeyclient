@@ -25,7 +25,7 @@ type APIClient interface {
 
 // AttestationVerifier interface for verifying attestations
 type AttestationVerifier interface {
-	Validate(attestationDocument string) (*nitroverifier.ValidationResult, error)
+	Validate(attestationDocument []byte) (*nitroverifier.ValidationResult, error)
 }
 
 // Service handles verification logic
@@ -87,8 +87,13 @@ func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult
 	result.SignatureHex = appAttestation.Signature
 	result.SignablePayload = response.SignablePayload
 
+	bootAttestationDocBytes, err := base64.StdEncoding.DecodeString(bootAttestationDoc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode boot attestation document: %w", err)
+	}
+
 	// Step 2: Verify attestation document using awsnitroverifier
-	validationResult, err := s.attestationVerifier.Validate(bootAttestationDoc)
+	validationResult, err := s.attestationVerifier.Validate(bootAttestationDocBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify attestation document: %w", err)
 	}

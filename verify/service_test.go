@@ -63,7 +63,7 @@ type mockAttestationVerifier struct {
 	err    error
 }
 
-func (m *mockAttestationVerifier) Validate(attestationDocument string) (*nitroverifier.ValidationResult, error) {
+func (m *mockAttestationVerifier) Validate(attestationDocument []byte) (*nitroverifier.ValidationResult, error) {
 	return m.result, m.err
 }
 
@@ -258,11 +258,14 @@ func TestVerifyAttestationError(t *testing.T) {
 	signatureHex := strings.Repeat("cd", 64)
 	appAttJSON := fmt.Sprintf(`{"message":"%s","publicKey":"%s","signature":"%s"}`, messageHex, validKey260, signatureHex)
 
+	// Use valid base64 for boot attestation
+	bootAttestationB64 := base64.StdEncoding.EncodeToString([]byte("boot-doc"))
+
 	apiResponse := &api.SignablePayloadResponse{
 		SignablePayload: "test-payload",
 		Attestations: map[api.AttestationType]string{
 			api.AppAttestationKey:  appAttJSON,
-			api.BootAttestationKey: "boot-doc",
+			api.BootAttestationKey: bootAttestationB64,
 		},
 	}
 
@@ -289,11 +292,14 @@ func TestVerifyInvalidAttestation(t *testing.T) {
 	signatureHex := strings.Repeat("fe", 64)
 	appAttJSON := fmt.Sprintf(`{"message":"%s","publicKey":"%s","signature":"%s"}`, messageHex, validKey260, signatureHex)
 
+	// Use valid base64 for boot attestation
+	bootAttestationB64 := base64.StdEncoding.EncodeToString([]byte("boot-doc"))
+
 	apiResponse := &api.SignablePayloadResponse{
 		SignablePayload: "test-payload",
 		Attestations: map[api.AttestationType]string{
 			api.AppAttestationKey:  appAttJSON,
-			api.BootAttestationKey: "boot-doc",
+			api.BootAttestationKey: bootAttestationB64,
 		},
 	}
 
@@ -430,11 +436,14 @@ func TestVerifyInvalidMessageHex(t *testing.T) {
 
 	appAttJSON := fmt.Sprintf(`{"message":"ZZZZZ","publicKey":"%s","signature":"%s"}`, validKey260, strings.Repeat("ab", 64))
 
+	// Use valid base64 for boot attestation
+	bootAttestationB64 := base64.StdEncoding.EncodeToString([]byte("boot-doc"))
+
 	apiResponse := &api.SignablePayloadResponse{
 		SignablePayload: "test-payload",
 		Attestations: map[api.AttestationType]string{
 			api.AppAttestationKey:  appAttJSON,
-			api.BootAttestationKey: "boot-doc",
+			api.BootAttestationKey: bootAttestationB64,
 		},
 	}
 
@@ -470,11 +479,14 @@ func TestVerifyInvalidSignatureHex(t *testing.T) {
 
 	appAttJSON := fmt.Sprintf(`{"message":"%s","publicKey":"%s","signature":"ZZZZ"}`, messageHex, validKey260)
 
+	// Use valid base64 for boot attestation
+	bootAttestationB64 := base64.StdEncoding.EncodeToString([]byte("boot-doc"))
+
 	apiResponse := &api.SignablePayloadResponse{
 		SignablePayload: "test-payload",
 		Attestations: map[api.AttestationType]string{
 			api.AppAttestationKey:  appAttJSON,
-			api.BootAttestationKey: "boot-doc",
+			api.BootAttestationKey: bootAttestationB64,
 		},
 	}
 

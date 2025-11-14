@@ -1,5 +1,13 @@
 github.com/anchorageoss/awsnitroverifier v0.0.0-20251104172123-3b5e72802772 h1:os/shmt9aZfs9IcAciQuJbDnKp9bkP0Ly6miCEpILW8=
 github.com/anchorageoss/awsnitroverifier v0.0.0-20251104172123-3b5e72802772/go.mod h1:FneTCO29DF7UG3DOzqZhJJfjW4oHuk62uuYXBbbBt/c=
+github.com/anchorageoss/awsnitroverifier v0.0.0-20251113175506-85da0b801d93 h1:yHbUWbZ8G8m/oAA4GLaTKGw3RcDIQzsizaHmeywz/tg=
+github.com/anchorageoss/awsnitroverifier v0.0.0-20251113175506-85da0b801d93/go.mod h1:FneTCO29DF7UG3DOzqZhJJfjW4oHuk62uuYXBbbBt/c=
+github.com/anchorageoss/awsnitroverifier v0.0.0-20251113203702-f67aa0cad53e h1:0HP6BFj4Ee8GeBrx3um3MU9nXPGJg4fvisTdRHU6Gbs=
+github.com/anchorageoss/awsnitroverifier v0.0.0-20251113203702-f67aa0cad53e/go.mod h1:FneTCO29DF7UG3DOzqZhJJfjW4oHuk62uuYXBbbBt/c=
+github.com/anchorageoss/awsnitroverifier v0.0.0-20251113232817-6ca7c799321b h1:KBZVI90/c/RBMss4mHxbpfq6dNK5h1qdzN2viDlro2g=
+github.com/anchorageoss/awsnitroverifier v0.0.0-20251113232817-6ca7c799321b/go.mod h1:FneTCO29DF7UG3DOzqZhJJfjW4oHuk62uuYXBbbBt/c=
+github.com/anchorageoss/awsnitroverifier v0.1.0 h1:T+8bY7WySGeuCEBCIFErG9QJand3BoK8FO2hgePbVWs=
+github.com/anchorageoss/awsnitroverifier v0.1.0/go.mod h1:FneTCO29DF7UG3DOzqZhJJfjW4oHuk62uuYXBbbBt/c=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fxamacker/cbor/v2 v2.9.0 h1:NpKPmjDBgUfBms6tr6JZkTHtfFGcMKsw3eGcmD/sapM=

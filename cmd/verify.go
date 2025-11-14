@@ -37,7 +37,7 @@ func VerifyCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:     "unsigned-payload",
-				Usage:    "Unsigned transaction payload (base64)",
+				Usage:    "Unsigned transaction payload (base64 or hex)",
 				Required: true,
 			},
 			&cli.StringFlag{
