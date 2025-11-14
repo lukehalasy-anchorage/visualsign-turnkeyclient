@@ -55,10 +55,10 @@ jobs:
       - name: Extract coverage percentage
         id: coverage
         run: |
-          COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
+          COVERAGE=$(go tool cover -func=coverage.out | grep "^total:" | awk '{print $3}' | sed 's/%//')
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
           echo "📊 Coverage summary (excluding cmd package):"
-          go tool cover -func=coverage.out | tail -1
+          go tool cover -func=coverage.out | grep "^total:"
 
       - name: Check coverage threshold
         run: |
