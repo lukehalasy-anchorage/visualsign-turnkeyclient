@@ -91,127 +91,101 @@ guarantees.
 
 #### Step 1: Call the API
 
-```go
-import (
-    "encoding/base64"
-    "encoding/hex"
-    "encoding/json"
-)
-
+```
 // Make API request to create signable payload
-request := CreateSignablePayloadRequest{
-    UnsignedPayload: base64EncodedTransaction,
-    Chain:           "CHAIN_SOLANA",
+request = {
+    unsignedPayload: base64_encode(transaction),
+    chain: "CHAIN_SOLANA"
 }
 
-response, err := turnkeyClient.CreateSignablePayload(request)
-if err != nil {
-    return err
-}
+response = turnkey_client.create_signable_payload(request)
 ```
 
 #### Step 2: Extract App Attestation
 
-```go
+```
 // Parse the app attestation JSON
-appAttestationJSON := response.Attestations["app_attestation"]
-var appAttestation struct {
-    Message   string `json:"message"`
-    PublicKey string `json:"publicKey"`
-    Signature string `json:"signature"`
-    Scheme    string `json:"scheme"`
-}
+app_attestation_json = response.attestations["app_attestation"]
 
-err = json.Unmarshal([]byte(appAttestationJSON), &appAttestation)
-if err != nil {
-    return err
-}
+app_attestation = parse_json(app_attestation_json)
+// Result contains:
+//   - message: hex string
+//   - publicKey: 130-character hex string
+//   - signature: hex string
+//   - scheme: "SIGNATURE_SCHEME_TK_API_P256"
 ```
 
 #### Step 3: Handle the 130-byte Public Key Format
 
-The public key is returned as a 130-byte hex string containing two 65-byte uncompressed P256 public keys. Use the latter 65 
+The public key is returned as a 130-byte hex string containing two 65-byte uncompressed P256 public keys. Use the latter 65
 bytes for verification:
 
-```go
-// Decode the 130-byte hex string
-publicKeyBytes, err := hex.DecodeString(appAttestation.PublicKey)
-if err != nil || len(publicKeyBytes) != 130 {
-    return errors.New("invalid public key format")
-}
+```
+// Decode the 130-character hex string to 130 bytes
+public_key_bytes = hex_decode(app_attestation.publicKey)
+assert length(public_key_bytes) == 130
 
 // Extract the latter 65 bytes (bytes 65-130)
-publicKeyForVerification := publicKeyBytes[65:]
+public_key_for_verification = public_key_bytes[65:130]
 
 // Verify it's an uncompressed P256 key (starts with 0x04)
-if publicKeyForVerification[0] != 0x04 {
-    return errors.New("expected uncompressed public key format")
-}
+assert public_key_for_verification[0] == 0x04
 
 // Parse X and Y coordinates (32 bytes each after the 0x04 prefix)
-x := new(big.Int).SetBytes(publicKeyForVerification[1:33])
-y := new(big.Int).SetBytes(publicKeyForVerification[33:65])
+x_coordinate = bytes_to_integer(public_key_for_verification[1:33])
+y_coordinate = bytes_to_integer(public_key_for_verification[33:65])
 
-pubKey := &ecdsa.PublicKey{
-    Curve: elliptic.P256(),
-    X:     x,
-    Y:     y,
-}
+// Create P256 public key from coordinates
+public_key = create_p256_public_key(x_coordinate, y_coordinate)
 ```
 
 #### Step 4: Verify the Signature
 
-```go
-import (
-    "crypto/ecdsa"
-    "crypto/elliptic"
-    "crypto/sha256"
-)
+```
+// Decode message and signature from hex
+message_bytes = hex_decode(app_attestation.message)
+signature_bytes = hex_decode(app_attestation.signature)
 
-// Decode message and signature
-messageBytes, _ := hex.DecodeString(appAttestation.Message)
-signatureBytes, _ := hex.DecodeString(appAttestation.Signature)
+// Compute SHA256 hash of the message
+message_hash = sha256(message_bytes)
 
-// Compute SHA256 of the message
-hash := sha256.Sum256(messageBytes)
+// Extract ECDSA signature components R and S (32 bytes each)
+r = bytes_to_integer(signature_bytes[0:32])
+s = bytes_to_integer(signature_bytes[32:64])
 
-// Extract R and S components (32 bytes each)
-r := new(big.Int).SetBytes(signatureBytes[:32])
-s := new(big.Int).SetBytes(signatureBytes[32:64])
+// Verify ECDSA P256 signature
+is_valid = ecdsa_verify_p256(public_key, message_hash, r, s)
 
-// Verify ECDSA signature
-if !ecdsa.Verify(pubKey, hash[:], r, s) {
-    return errors.New("signature verification failed")
-}
+if not is_valid:
+    throw error("signature verification failed")
 
-fmt.Println("✓ Level 1: Signature verified successfully")
+print("✓ Level 1: Signature verified successfully")
 ```
 
 #### Step 5: Return the Signable Payload (this is the payload we show to the user)
 
-```go
+```
 // The signablePayload is ready to be shown to the user
-parsedTransaction := response.SignablePayload
-returnparsedTransaction 
+parsed_transaction = response.signable_payload
+return parsed_transaction
 ```
 
 ### Testing Level 1
 
-```go
-func TestLevel1Verification(t *testing.T) {
+```
+test_level_1_verification():
     // Test with known valid signature
-    publicKey := "04...130 hex chars..."
-    message := "deadbeef..."
-    signature := "a1b2c3d4..."
+    public_key = "04...130 hex chars..."
+    message = "deadbeef..."
+    signature = "a1b2c3d4..."
 
-    valid := verifyP256Signature(publicKey, message, signature)
-    assert.True(t, valid)
+    is_valid = verify_p256_signature(public_key, message, signature)
+    assert is_valid == true
 
     // Test with tampered signature
-    tamperedSig := "00000000..."
-    valid = verifyP256Signature(publicKey, message, tamperedSig)
-    assert.False(t, valid)
-}
+    tampered_signature = "00000000..."
+    is_valid = verify_p256_signature(public_key, message, tampered_signature)
+    assert is_valid == false
 ```
 
 ---
@@ -240,136 +214,103 @@ PCRs are SHA384 hashes that uniquely identify the enclave's software stack:
 | PCR0 | Enclave image file (.eif) | Verifies exact enclave image |
 | PCR1 | Linux kernel and bootstrap | Validates OS environment |
 | PCR2 | Application | Confirms application code |
-| PCR3 | IAM role + Instance ID | Ties to AWS identity (dynamic) |
+| PCR3 | IAM role assigned to the parent instance| Ensures that the attestation process succeeds only when the parent instance has the correct IAM
+role. |
 
-### Implementation
+### Reference Implementation
 
 #### Step 1: Install AWS Nitro Verifier
 
 ```bash
-go get github.com/anchorageoss/awsnitroverifier
+go get github.com/anchorageoss/awsnitroverifier@latest
 ```
 
 #### Step 2: Extract and Verify Boot Attestation
 
-```go
-import (
-    nitroverifier "github.com/anchorageoss/awsnitroverifier"
-)
+Use a library like [awsnitroverifier](https://github.com/anchorageoss/awsnitroverifier) to verify the attestation:
 
+```
 // Extract boot attestation from response
-bootAttestationB64 := response.Attestations["boot_attestation"]
-bootAttestationBytes, err := base64.StdEncoding.DecodeString(bootAttestationB64)
-if err != nil {
-    return err
-}
+boot_attestation_b64 = response.attestations["boot_attestation"]
+boot_attestation_string = base64_decode(boot_attestation_b64)
 
-// Create verifier
-verifier := nitroverifier.NewVerifier(nitroverifier.VerifierOptions{
-    SkipTimestampCheck: false, // Enable timestamp validation
+// Create AWS Nitro verifier
+// Library reference: github.com/anchorageoss/awsnitroverifier
+verifier = aws_nitro_verifier.new_verifier({
+    skip_timestamp_check: false  // Enable timestamp validation
 })
 
 // Validate attestation document
-validationResult, err := verifier.Validate(bootAttestationBytes)
-if err != nil {
-    return fmt.Errorf("attestation validation failed: %w", err)
-}
+// This verifies AWS signature, certificate chain, and timestamp
+validation_result = verifier.validate(boot_attestation_string)
 
-if !validationResult.Valid {
-    return fmt.Errorf("attestation invalid: %v", validationResult.Errors)
-}
+if not validation_result.valid:
+    throw error("attestation validation failed: " + validation_result.errors)
 
-fmt.Println("✓ Level 2: Boot attestation verified by AWS Nitro")
+print("✓ Level 2: Boot attestation verified by AWS Nitro")
 ```
 
 #### Step 3: Validate PCR Values
 
-```go
-// Extract verified attestation data
-attestationDoc := validationResult.Document
+```
+// Extract verified attestation document from validation result
+attestation_doc = validation_result.document
 
-// Define approved PCR values
+// Define approved PCR values (SHA384 hashes as hex strings)
 // These values should be obtained from Turnkey documentation
 // or from your own enclave builds
-approvedPCRs := map[uint]string{
+approved_pcrs = {
     0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
     1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
     2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f",
-    // PCR3 is dynamic - either skip or validate pattern
+    // PCR3 is dynamic (contains IAM role) - either skip or validate pattern
 }
 
-// Verify each PCR
-for idx, expectedHash := range approvedPCRs {
-    actualPCR := attestationDoc.PCRs[idx]
-    actualHash := hex.EncodeToString(actualPCR)
+// Verify each PCR (PCRs are byte arrays in attestation_doc)
+for each (pcr_index, expected_hash) in approved_pcrs:
+    actual_pcr_bytes = attestation_doc.pcrs[pcr_index]
+    actual_hash = bytes_to_hex(actual_pcr_bytes)
 
-    if actualHash != expectedHash {
-        return fmt.Errorf("PCR[%d] mismatch: expected %s, got %s",
-            idx, expectedHash, actualHash)
-    }
-}
+    if actual_hash != expected_hash:
+        throw error("PCR[" + pcr_index + "] mismatch: expected " +
+                   expected_hash + ", got " + actual_hash)
 
-fmt.Printf("✓ Level 2: All PCR values validated\n")
-fmt.Printf("  Module ID: %s\n", attestationDoc.ModuleID)
-fmt.Printf("  PCR0: %x...\n", attestationDoc.PCRs[0][:8])
-fmt.Printf("  UserData: %x\n", attestationDoc.UserData)
+print("✓ Level 2: All PCR values validated")
+print("  Module ID: " + attestation_doc.module_id)
+print("  PCR0: " + bytes_to_hex(attestation_doc.pcrs[0])[0:16] + "...")
+print("  UserData: " + bytes_to_hex(attestation_doc.user_data))
 ```
 
 #### Step 4: Maintain PCR Allowlist
 
-```go
+```
 // PCR values change when enclave software is updated
 // Implement a versioning strategy for transitions
 
-type PCRSet struct {
-    PCR0      string
-    PCR1      string
-    PCR2      string
-    ValidFrom time.Time
-    ValidUntil time.Time
+pcr_set = {
+    pcr0: string,
+    pcr1: string,
+    pcr2: string,
 }
 
-var approvedPCRSets = []PCRSet{
+approved_pcr_sets = [
     {
-        PCR0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
-        PCR1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
-        PCR2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f",
-        ValidFrom: time.Parse("2025-01-01"),
-        ValidUntil: time.Parse("2025-06-01"),
+        pcr0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
+        pcr1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
+        pcr2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f",
     },
-    // Add new sets during software updates
-}
+]
 
-func validatePCRs(pcrs map[uint][]byte) error {
-    now := time.Now()
-    for _, pcrSet := range approvedPCRSets {
-        if now.After(pcrSet.ValidFrom) && now.Before(pcrSet.ValidUntil) {
-            if matchesPCRSet(pcrs, pcrSet) {
-                return nil
-            }
-        }
-    }
-    return errors.New("no matching PCR set found")
-}
+function validate_pcrs(pcrs):
+    now = current_timestamp()
+    for each pcr_set in approved_pcr_sets:
+        if now >= pcr_set.valid_from and now < pcr_set.valid_until:
+            if matches_pcr_set(pcrs, pcr_set):
+                return success
+
+    throw error("no matching PCR set found")
 ```
 
-### Building visualsign-parser
-
-To independently verify PCR2, you can build the visualsign-parser from source:
-
-```bash
-# Clone the repository
-git clone https://github.com/anchorageoss/visualsign-parser
-cd visualsign-parser
-
-# Build the binary
-make build
-
-# Compute SHA256 (this should match Pivot.Hash in manifest)
-sha256sum build/visualsign-parser
-```
-
----
 
 ## Level 3: Complete Manifest Verification
 
@@ -393,7 +334,7 @@ The manifest is a Borsh-encoded security policy containing:
 ```
 Manifest Structure:
 ├── Namespace
-│   └── Name: "testkey/anchorageoss/visualsign-parser"
+│   └── Name: "anchorageoss/visualsign-parser"
 ├── Pivot (Application Config)
 │   ├── Hash: SHA256 of visualsign-parser binary ← THIS IS THE SHA256SUM
 │   ├── Restart: Policy (Always/Never)
@@ -415,131 +356,127 @@ niquely identifies the exact application binary running in the enclave.
 
 #### Step 1: Extract Manifest from Response
 
-```go
+```
 // Get manifest envelope (includes approval signatures)
-manifestEnvelopeB64 := response.BootProof.QosManifestEnvelopeB64
+manifest_envelope_b64 = response.boot_proof.qos_manifest_envelope_b64
 
 // Also available: raw manifest without signatures
-rawManifestB64 := response.BootProof.QosManifestB64
+raw_manifest_b64 = response.boot_proof.qos_manifest_b64
 ```
 
 #### Step 2: Decode Manifest from Borsh
 
-```go
-import (
-    "github.com/anchorageoss/visualsign-turnkeyclient/manifest"
-)
+Use a Borsh deserialization library to decode the manifest. Reference implementation available at [github.com/anchorageoss/visualsign-turnkeyclient/manifest](https://github.com/anchorageoss/visualsign-turnkeyclient/tree/main/manifest):
 
-// Decode the manifest envelope
-envelope, manifestStruct, manifestBytes, _, err :=
-    manifest.DecodeManifestEnvelopeFromBase64(manifestEnvelopeB64)
-if err != nil {
-    // Try raw manifest if envelope fails
-    manifestStruct, manifestBytes, err =
-        manifest.DecodeRawManifestFromBase64(rawManifestB64)
-    if err != nil {
-        return err
-    }
-}
+```
+// Try to decode the manifest envelope (with approval signatures)
+// Returns: envelope, manifest_struct, manifest_bytes, envelope_bytes
+try:
+    envelope, manifest_struct, manifest_bytes, envelope_bytes =
+        borsh_decode_manifest_envelope_from_base64(manifest_envelope_b64)
+catch decoding_error:
+    // Fall back to raw manifest if envelope decode fails
+    manifest_struct, manifest_bytes =
+        borsh_decode_raw_manifest_from_base64(raw_manifest_b64)
+
+// manifest_struct now contains:
+//   - namespace.name: string (e.g., "anchorageoss/visualsign-parser")
+//   - pivot.hash: 32-byte SHA256 of visualsign-parser binary
+//   - pivot.restart: restart policy
+//   - pivot.args: command line arguments
+//   - enclave.pcr0, pcr1, pcr2, pcr3: expected PCR values (byte arrays)
+//   - enclave.qos_commit: QuorumOS git commit hash
 ```
 
 #### Step 3: Verify Manifest Hash Against UserData
 
 The UserData field in the boot attestation contains the SHA256 hash of the manifest:
 
-```go
-// Compute SHA256 of manifest
-manifestHash := sha256.Sum256(manifestBytes)
-manifestHashHex := hex.EncodeToString(manifestHash[:])
+```
+// Compute SHA256 hash of the manifest bytes
+manifest_hash = sha256(manifest_bytes)
+manifest_hash_hex = bytes_to_hex(manifest_hash)
 
 // Get UserData from boot attestation (from Level 2)
-userDataHex := hex.EncodeToString(attestationDoc.UserData)
+user_data_hex = bytes_to_hex(attestation_doc.user_data)
 
 // Verify they match
-if manifestHashHex != userDataHex {
-    return fmt.Errorf("manifest hash mismatch: computed %s, attestation has %s",
-        manifestHashHex, userDataHex)
-}
+if manifest_hash_hex != user_data_hex:
+    throw error("manifest hash mismatch: computed " + manifest_hash_hex +
+                ", attestation has " + user_data_hex)
 
-fmt.Println("✓ Level 3: Manifest hash verified against boot attestation")
+print("✓ Level 3: Manifest hash verified against boot attestation")
 ```
 
 #### Step 4: Validate visualsign-parser Binary Hash
 
-```go
-// Extract the SHA256 hash of visualsign-parser binary
-pivotHash := hex.EncodeToString(manifestStruct.Pivot.Hash[:])
-fmt.Printf("visualsign-parser SHA256: %s\n", pivotHash)
+```
+// Extract the SHA256 hash of visualsign-parser binary from manifest
+pivot_hash = bytes_to_hex(manifest_struct.pivot.hash)
+print("visualsign-parser SHA256: " + pivot_hash)
 
 // Verify against expected hash
 // This hash can be computed independently by building visualsign-parser
-expectedBinaryHash := "ef9f552a75bf22c7556b9900bae09f3557eb46f9123b00f94fe71baa8656e678"
-if pivotHash != expectedBinaryHash {
-    return fmt.Errorf("visualsign-parser binary hash mismatch")
-}
+expected_binary_hash = "ef9f552a75bf22c7556b9900bae09f3557eb46f9123b00f94fe71baa8656e678"
+if pivot_hash != expected_binary_hash:
+    throw error("visualsign-parser binary hash mismatch")
 
-// Verify namespace
-expectedNamespace := "testkey/anchorageoss/visualsign-parser"
-if manifestStruct.Namespace.Name != expectedNamespace {
-    return fmt.Errorf("unexpected namespace: %s", manifestStruct.Namespace.Name)
-}
+// Verify namespace matches expected value
+expected_namespace = "anchorageoss/visualsign-parser"
+if manifest_struct.namespace.name != expected_namespace:
+    throw error("unexpected namespace: " + manifest_struct.namespace.name)
 
-fmt.Println("✓ Level 3: visualsign-parser binary verified")
+print("✓ Level 3: visualsign-parser binary verified")
 ```
 
 #### Step 5: Validate PCRs from Manifest
 
-```go
+```
 // Compare manifest PCRs with attestation PCRs
-manifestPCRs := map[uint][]byte{
-    0: manifestStruct.Enclave.Pcr0,
-    1: manifestStruct.Enclave.Pcr1,
-    2: manifestStruct.Enclave.Pcr2,
-    3: manifestStruct.Enclave.Pcr3,
+manifest_pcrs = {
+    0: manifest_struct.enclave.pcr0,
+    1: manifest_struct.enclave.pcr1,
+    2: manifest_struct.enclave.pcr2,
+    3: manifest_struct.enclave.pcr3
 }
 
-for idx, expectedPCR := range manifestPCRs {
-    actualPCR := attestationDoc.PCRs[idx]
+for each (pcr_index, expected_pcr_bytes) in manifest_pcrs:
+    actual_pcr_bytes = attestation_doc.pcrs[pcr_index]
 
-    if !bytes.Equal(expectedPCR, actualPCR) {
-        return fmt.Errorf("PCR[%d] mismatch between manifest and attestation", idx)
-    }
-}
+    if expected_pcr_bytes != actual_pcr_bytes:
+        throw error("PCR[" + pcr_index + "] mismatch between manifest and attestation")
 
-fmt.Println("✓ Level 3: All PCRs match between manifest and attestation")
+print("✓ Level 3: All PCRs match between manifest and attestation")
 ```
 
 #### Step 6: Monitor Manifest Updates
 
-```go
+```
 // Store and monitor manifest hashes for changes
-type ManifestTracker struct {
-    CurrentHash  string
-    PreviousHash string
-    LastUpdated  time.Time
+manifest_tracker = {
+    current_hash: string,
+    previous_hash: string,
+    last_updated: timestamp
 }
 
-func (m *ManifestTracker) CheckManifestUpdate(newHash string) {
-    if newHash != m.CurrentHash {
+function check_manifest_update(new_hash):
+    if new_hash != manifest_tracker.current_hash:
         // Manifest has changed!
-        log.Warn("MANIFEST UPDATE DETECTED",
-            "previous", m.CurrentHash,
-            "new", newHash,
-            "timestamp", time.Now())
+        log_warning("MANIFEST UPDATE DETECTED",
+            "previous": manifest_tracker.current_hash,
+            "new": new_hash,
+            "timestamp": current_timestamp())
 
         // Alert security team
-        alertSecurityTeam("Manifest updated", newHash)
+        alert_security_team("Manifest updated", new_hash)
 
         // Require manual approval before accepting
-        if !approveManifestUpdate(newHash) {
-            panic("Unapproved manifest update")
-        }
+        if not approve_manifest_update(new_hash):
+            throw critical_error("Unapproved manifest update")
 
-        m.PreviousHash = m.CurrentHash
-        m.CurrentHash = newHash
-        m.LastUpdated = time.Now()
-    }
-}
+        manifest_tracker.previous_hash = manifest_tracker.current_hash
+        manifest_tracker.current_hash = new_hash
+        manifest_tracker.last_updated = current_timestamp()
 ```
 
 ### Reproducing the SHA256
@@ -567,31 +504,27 @@ sha256sum build/visualsign-parser
 
 Turnkey API uses ECDSA P256 signatures for authentication:
 
-```go
-// Generate authentication stamp
-func generateAuthStamp(privateKey *ecdsa.PrivateKey, requestBody []byte) (string, error) {
+```
+// Generate authentication stamp for API request
+function generate_auth_stamp(private_key, request_body_bytes):
     // Hash the request body
-    hash := sha256.Sum256(requestBody)
+    hash = sha256(request_body_bytes)
 
-    // Sign with private key
-    r, s, err := ecdsa.Sign(rand.Reader, privateKey, hash[:])
-    if err != nil {
-        return "", err
+    // Sign with ECDSA P256 private key
+    r, s = ecdsa_sign_p256(private_key, hash)
+
+    // Encode signature (R and S components concatenated)
+    signature = concatenate_bytes(r, s)
+
+    // Create stamp JSON structure
+    stamp = {
+        "publicKey": bytes_to_hex(compress_public_key(private_key.public_key)),
+        "signature": bytes_to_hex(signature),
+        "scheme": "SIGNATURE_SCHEME_TK_API_P256"
     }
 
-    // Encode signature
-    signature := append(r.Bytes(), s.Bytes()...)
-
-    // Create stamp JSON
-    stamp := map[string]string{
-        "publicKey": hex.EncodeToString(compressPublicKey(privateKey.PublicKey)),
-        "signature": hex.EncodeToString(signature),
-        "scheme":    "SIGNATURE_SCHEME_TK_API_P256",
-    }
-
-    stampJSON, _ := json.Marshal(stamp)
-    return base64.StdEncoding.EncodeToString(stampJSON), nil
-}
+    stamp_json = json_encode(stamp)
+    return base64_encode(stamp_json)
 ```
 
 ### API Endpoints
@@ -731,26 +664,23 @@ As documented in the [Trail of Bits analysis](https://blog.trailofbits.com/2024/
 
 #### PCR Verification in Practice
 
-```go
+```
 // Level 2: Validate PCRs from attestation
 // See: https://github.com/anchorageoss/visualsign-turnkeyclient/blob/24886a1a9e5cb4f39b8f88cd9c0ef31603074683/verify/service.go#L107
-result.PCRs = validationResult.Document.PCRs
+result.pcrs = validation_result.document.pcrs
 
 // Define approved PCR values (PCR0, PCR1, PCR2)
-approvedPCRs := map[uint]string{
+approved_pcrs = {
     0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
     1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
-    2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f",
-    // Skip PCR3 - it's dynamic per instance
+    2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f"
 }
 
 // Verify each PCR
-for idx, expectedHash := range approvedPCRs {
-    actualHash := hex.EncodeToString(attestationDoc.PCRs[idx])
-    if actualHash != expectedHash {
-        return fmt.Errorf("PCR[%d] mismatch", idx)
-    }
-}
+for each (pcr_index, expected_hash) in approved_pcrs:
+    actual_hash = bytes_to_hex(attestation_doc.pcrs[pcr_index])
+    if actual_hash != expected_hash:
+        throw error("PCR[" + pcr_index + "] mismatch")
 ```
 
 ---
@@ -774,20 +704,18 @@ for idx, expectedHash := range approvedPCRs {
 
 **CRITICAL**: Always verify attestation before trusting the public key
 
-```go
+```
 // WRONG - trusts public key without attestation:
-publicKey := extractPublicKey(response.AppAttestation)
-valid := verifySignature(publicKey, message, signature) // INSECURE!
+public_key = extract_public_key(response.app_attestation)
+is_valid = verify_signature(public_key, message, signature) // INSECURE!
 
 // CORRECT - attestation verified first:
-if err := verifyBootAttestation(response); err != nil {
-    return err
-}
-if err := verifyManifest(response); err != nil {
-    return err
-}
-publicKey := extractPublicKey(response.AppAttestation)
-valid := verifySignature(publicKey, message, signature)
+verify_boot_attestation(response)  // Level 2
+// Only after attestation verification, trust the public key
+public_key = extract_public_key(response.boot_attestation)[:65]
+is_valid = verify_signature(public_key, message, signature)
+verify_manifest(response, expected_pcrs, valid_pivot_hash)          // Level 3
+
 ```
 
 The attestation verification proves that the public key was generated inside a legitimate enclave running authorized code.
@@ -802,19 +730,6 @@ The attestation verification proves that the public key was generated inside a l
 - TLS 1.3 required
 - Certificate validation enabled
 - Hostname verification enabled
-
-**Implementation**:
-```go
-tlsConfig := &tls.Config{
-    MinVersion: tls.VersionTLS13,
-}
-
-// Optional: Certificate pinning for additional security
-tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-    return verifyPinnedCertificate(rawCerts[0])
-}
-```
-
 ---
 
 ### Operational Security
@@ -824,93 +739,65 @@ tlsConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x5
 **Critical Events to Monitor**:
 
 1. **Manifest Changes**
-```go
-if manifestHash != expectedManifestHash {
-    alert := SecurityAlert{
-        Severity: "CRITICAL",
-        Type:     "MANIFEST_CHANGE",
-        Details: map[string]string{
-            "expected": expectedManifestHash,
-            "actual":   manifestHash,
-        },
+```
+if manifest_hash != expected_manifest_hash:
+    alert = {
+        severity: "WARNING",
+        type: "MANIFEST_CHANGE",
+        details: {
+            "expected": expected_manifest_hash,
+            "actual": manifest_hash
+        }
     }
-    sendSecurityAlert(alert)
-}
+    send_wallet_team_alert(alert)
 ```
 
-2. **Verification Failures**
-```go
-// Track failure rate
-metrics.Counter("verification.failure",
-    "level", verificationLevel,
-    "reason", failureReason)
+This doesn't always mean security alert - something like new host may have been deployed
 
-if failureRate > 0.01 { // 1% threshold
-    alertSecurityTeam("High verification failure rate", failureRate)
-}
+2. **Verification Failures**
+```
+// Track failure rate using metrics
+metrics.increment_counter("verification.failure",
+    tags: {
+        "level": verification_level,
+        "reason": failure_reason
+    })
+
+if failure_rate > 0.01:  // 1% threshold
+    alert_security_team("High verification failure rate", failure_rate)
 ```
 
 3. **PCR Mismatches**
-```go
-if !validatePCRs(attestation.PCRs) {
+```
+if not validate_pcrs(attestation.pcrs):
     // PCR mismatch is CRITICAL - could indicate compromise
-    sendSecurityAlert(SecurityAlert{
-        Severity: "CRITICAL",
-        Type:     "PCR_MISMATCH",
-        Details:  extractPCRDetails(attestation),
+    send_security_alert({
+        severity: "CRITICAL",
+        type: "PCR_MISMATCH",
+        details: extract_pcr_details(attestation)
     })
-    return errors.New("SECURITY: PCR validation failed")
-}
+    throw critical_error("SECURITY: PCR validation failed")
 ```
 
-#### Security Event Logging
-
-**Required Logs**:
-```go
-// Log all verification attempts
-logger.Info("verification_attempt",
-    "level", verificationLevel,
-    "tx_id", transactionID)
-
-// Log verification results
-logger.Info("verification_result",
-    "level", verificationLevel,
-    "result", "success",
-    "duration_ms", durationMs)
-
-// Log security-critical events
-logger.Warn("manifest_validation",
-    "manifest_hash", manifestHash,
-    "approved", isApproved)
-```
-
-**Retention**:
-- Security logs: 1 year minimum
-- Audit logs: 7 years for compliance requirements
-- Encrypt logs at rest
+PCR3 is Role change, this could happen in future but I'd expect Turnkey to give notice here
 
 #### PCR and Manifest Management
 
 **Version Management**:
-```go
-type PCRSet struct {
-    PCR0       string
-    PCR1       string
-    PCR2       string
-    ValidFrom  time.Time
-    ValidUntil time.Time
+```python
+pcr_set = {
+    pcr0: string,
+    pcr1: string,
+    pcr2: string,
 }
 
-var approvedPCRSets = []PCRSet{
+approved_pcr_sets = [
     {
-        PCR0:       "f67076a8...",
-        PCR1:       "bcdf05fe...",
-        PCR2:       "4c495bf7...",
-        ValidFrom:  time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
-        ValidUntil: time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC),
-    },
-    // Add new sets during software updates with overlap period
-}
+        pcr0: "f67076a8...",
+        pcr1: "bcdf05fe...",
+        pcr2: "4c495bf7...",
+    }
+]
 ```
 
 **Update Process**:
@@ -933,7 +820,7 @@ In future we expect to run [VisualSign Parser](https://github.com/anchorageoss/v
 
 #### 2. PCR3 Variability
 
-**Issue**: PCR3 includes hash of the IAM Role, which are dynamic per enclave instance. In practice this hasn't been a problem
+**Issue**: PCR3 includes hash of the IAM Role, which are dynamic per enclave instance. In practice this has been static for us.
 
 #### 3. PCR Limitations
 
@@ -954,28 +841,6 @@ In future we expect to run [VisualSign Parser](https://github.com/anchorageoss/v
 **Current State**: Input signature verification not yet implemented in Level 1
 
 **Roadmap**: Future versions will include input signature verification
-
----
-
-### Compliance Considerations
-
-#### Financial Services Regulations
-
-**Recommended Configuration**:
-- **Level 3 verification** for regulated financial activities
-- Complete audit trail of verification operations
-- Annual security audits and penetration testing
-- Incident response procedures
-
-**Relevant Standards**:
-- SOC 2 Type II
-- PCI DSS (if handling payment cards)
-- MiCA (EU Crypto-Assets Regulation)
-- GDPR (EU data protection)
-
-Consult your compliance team for specific requirements.
-
----
 
 ### Trust Model
 
@@ -1060,7 +925,6 @@ verification:
     - pcr0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c"
       pcr1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b"
       pcr2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f"
-      valid_until: "2025-06-01"
 
   # Level 3: Manifest validation
   approved_manifest_hashes:
@@ -1072,41 +936,19 @@ verification:
 
 ### Monitoring
 
-```go
+```python
 // Track verification metrics
-metrics.Counter("wallet.verification.success", tags{"level": "3"})
-metrics.Counter("wallet.verification.failure", tags{"level": "3", "reason": "pcr_mismatch"})
-metrics.Histogram("wallet.verification.duration_ms")
+metrics.increment_counter("wallet.verification.success", tags: {"level": "3"})
+metrics.increment_counter("wallet.verification.failure",
+    tags: {"level": "3", "reason": "pcr_mismatch"})
+metrics.record_histogram("wallet.verification.duration_ms", duration_value)
 
 // Alert on anomalies
-if manifestHash != expectedHash {
-    metrics.Counter("wallet.security.manifest_change")
-    alertSecurityTeam("Manifest changed", manifestHash)
-}
+if manifest_hash != expected_hash:
+    metrics.increment_counter("wallet.security.manifest_change")
+    alert_security_team("Manifest changed", manifest_hash)
 ```
 
-### Migration Strategy
-
-To upgrade from Level 1 → 2 → 3:
-
-```go
-// Run new level in shadow mode first
-func verify(response Response) error {
-    // Current production level
-    if err := verifyLevel2(response); err != nil {
-        return err
-    }
-
-    // Shadow mode for next level
-    go func() {
-        if err := verifyLevel3(response); err != nil {
-            log.Warn("Level 3 would fail", "error", err)
-            metrics.Counter("wallet.shadow.level3.failure")
-        }
-    }()
-
-    return nil
-}
 ---
 
 ## Reference Implementation
