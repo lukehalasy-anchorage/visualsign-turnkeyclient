@@ -17,28 +17,38 @@ A Go client for Turnkey's Visualsign API that provides end-to-end verification o
 
 This project requires Go 1.25.0 or later.
 
-```
-# Build binary to bin/ directory using Makefile
+### Install from Source
+
+```bash
+# Option 1: Install to $GOBIN (recommended for users)
+go install github.com/anchorageoss/visualsign-turnkeyclient@latest
+
+# Option 2: Build locally to bin/ directory (recommended for developers)
 make build
 
-# Or build directly with go
-go build -o bin/turnkey-client .
+# Option 3: Build directly with go
+go build -o bin/visualsign-turnkeyclient .
 
-# Or run directly without building
+# Option 4: Run directly without building
 go run . <command> [args...]
 ```
 
-### Running Tests
+After installation, the binary will be available as `visualsign-turnkeyclient`.
+
+### Development
 
 ```bash
-# Run all tests with coverage
+# Run all tests with coverage (excludes cmd package)
 make test
 
-# Run tests and view coverage report
+# Run tests with strict coverage threshold check (80% minimum)
+make test-strict
+
+# Generate and view HTML coverage report
 make test-coverage
 
-# Run tests and serve coverage interactively (http://localhost:3000)
-make test-cover
+# Serve coverage report interactively (http://localhost:3000)
+make test-coverage-serve
 
 # Run specific test suite
 make test-manifest    # Tests for manifest parsing
@@ -48,7 +58,24 @@ make test-client      # Tests for client functionality
 
 # Run benchmarks
 make bench
+
+# Code quality checks
+make check-deps       # Check for prohibited dependencies
+make lint             # Run linter with dependency checks
+make fmt              # Format Go code
+
+# Clean build artifacts
+make clean
 ```
+
+### Continuous Integration
+
+The CI workflow runs on every push and pull request:
+- ✅ Dependency checks (no prohibited `anchorlabsinc` imports)
+- ✅ Tests with race detection and 80% coverage minimum
+- ✅ Linting with `golangci-lint`
+- ✅ Build verification
+- 📊 Coverage reports uploaded to artifacts
 
 ## Commands
 
@@ -57,7 +84,7 @@ make bench
 Parse a transaction and extract attestations:
 
 ```bash
-./bin/turnkey-client parse \
+./bin/visualsign-turnkeyclient parse \
   --host https://api.turnkey.com \
   --organization-id <your-org-id> \
   --key-name testkey \
@@ -69,7 +96,7 @@ Parse a transaction and extract attestations:
 Perform end-to-end verification of a transaction:
 
 ```bash
-./bin/turnkey-client verify \
+./bin/visualsign-turnkeyclient verify \
   --host https://api.turnkey.com \
   --organization-id <your-org-id> \
   --key-name testkey \
@@ -88,16 +115,16 @@ Decode and display a QoS manifest from a file or base64 string:
 
 ```bash
 # Decode from file (human-readable)
-./bin/turnkey-client decode-manifest raw --file /tmp/manifest.bin
+./bin/visualsign-turnkeyclient decode-manifest raw --file /tmp/manifest.bin
 
 # Decode from file (JSON output)
-./bin/turnkey-client decode-manifest raw --file /tmp/manifest.bin --json
+./bin/visualsign-turnkeyclient decode-manifest raw --file /tmp/manifest.bin --json
 
 # Decode from base64 string
-./bin/turnkey-client decode-manifest raw --base64 "AQAAAAAAA..." --json
+./bin/visualsign-turnkeyclient decode-manifest raw --base64 "AQAAAAAAA..." --json
 
 # Decode manifest envelope (with approvals)
-./bin/turnkey-client decode-manifest envelope --file /tmp/manifest.bin --json
+./bin/visualsign-turnkeyclient decode-manifest envelope --file /tmp/manifest.bin --json
 ```
 
 #### Flags
@@ -205,7 +232,7 @@ We validate our Go implementation against Turnkey's reference Rust `qos_client`:
 #### Step 1: Save Manifest from Go Client
 
 ```bash
-./bin/turnkey-client verify \
+./bin/visualsign-turnkeyclient verify \
   --host https://api.testkey.turnkey.com \
   --organization-id <your-org-id> \
   --key-name testkey \
@@ -382,7 +409,7 @@ If manifest hash doesn't match UserData:
 
 ```bash
 # Compare hashes
-./bin/turnkey-client verify ... 2>&1 | grep "SHA256"
+./bin/visualsign-turnkeyclient verify ... 2>&1 | grep "SHA256"
 ```
 
 #### Decoding Errors
@@ -449,60 +476,6 @@ type Manifest struct {
 - `github.com/near/borsh-go`: Borsh serialization/deserialization
 - `github.com/urfave/cli/v3`: Command-line interface framework
 
-### Code Structure
-
-The project is organized into focused packages for better testability and reusability:
-
-```
-.
-├── main.go                    # CLI entry point (23 lines)
-├── go.mod                     # Go module definition
-│
-├── api/                       # Turnkey API client
-│   ├── client.go              # HTTP client, CreateSignablePayload, attestation
-│   ├── types.go               # Request/response types
-│   └── client_test.go         # Internal tests for private methods
-│
-├── cmd/                       # CLI command handlers (urfave/cli)
-│   ├── verify.go              # End-to-end verification command
-│   ├── parse.go               # Parse transaction command
-│   └── decode.go              # Decode manifest commands (raw/envelope)
-│
-├── manifest/                  # QoS manifest parsing and hashing
-│   ├── types.go               # Manifest structures (Borsh-encoded)
-│   ├── parser.go              # Borsh deserialization functions
-│   ├── hash.go                # SHA256 hash computation
-│   └── *_test.go              # Manifest tests
-│
-├── verify/                    # Attestation verification service
-│   ├── service.go             # Core verification logic
-│   ├── types.go               # VerifyRequest, VerifyResult
-│   ├── formatter.go           # Output formatting (no printing)
-│   └── *_test.go              # Verification tests
-│
-├── crypto/                    # Cryptographic operations
-│   ├── signing.go             # ECDSA signing and verification
-│   └── *_test.go              # Crypto tests
-│
-├── keys/                      # API key management
-│   ├── loader.go              # Load keys from ~/.config/turnkey/keys/
-│   └── *_test.go              # Key loading tests
-│
-├── bin/                       # Build output (created by make build)
-│   └── turnkey-client         # Compiled binary
-│
-├── testdata/                  # Test fixtures (Borsh manifests)
-├── Makefile                   # Build and test targets
-├── verify-manifest.sh         # Automated verification script
-└── README.md                  # This file
-```
-
-**Architecture Layers:**
-- **CLI Layer** (`cmd/`): urfave/cli command handlers with no business logic
-- **Service Layer** (`verify/`, `api/`): Business logic and API client
-- **Library Layer** (all packages): Pure functions, dependency injection via interfaces
-- **Testability**: All layers use interfaces for dependency injection, enabling mock testing
-
 ## Security Considerations
 
 ### Attestation Verification
@@ -539,7 +512,7 @@ The client verifies:
 make build
 
 # 1. Run verification and save manifest
-./bin/turnkey-client verify \
+./bin/visualsign-turnkeyclient verify \
   --host https://api.testkey.turnkey.com \
   --organization-id <your-org-id> \
   --key-name testkey \
@@ -547,10 +520,10 @@ make build
   --save-qos-manifest /tmp/manifest.bin
 
 # 2. Decode manifest with our Go client
-./bin/turnkey-client decode-manifest raw --file /tmp/manifest.bin
+./bin/visualsign-turnkeyclient decode-manifest raw --file /tmp/manifest.bin
 
 # 3. Get JSON output from our Go client
-./bin/turnkey-client decode-manifest raw --file /tmp/manifest.bin --json | jq .
+./bin/visualsign-turnkeyclient decode-manifest raw --file /tmp/manifest.bin --json | jq .
 
 # 4. Verify with Docker container (easiest method)
 docker run -v /tmp:/tmp \
@@ -646,7 +619,7 @@ make test-cover
 make build
 
 # Or build directly with go
-go build -o bin/turnkey-client .
+go build -o bin/visualsign-turnkeyclient .
 
 # Or run directly without building
 go run . <command> [args...]
@@ -665,11 +638,13 @@ For private method testing, add tests to the same-package `*_test.go` file (e.g.
 
 ## References
 
-- [AWS Nitro Enclaves](https://aws.amazon.com/ec2/nitro/nitro-enclaves/)
+- [visualsign-parser](https://github.com/anchorageoss/visualsign-parser) - The enclave application binary
+- [AWS Nitro Enclaves](https://aws.amazon.com/ec2/nitro/nitro-enclaves/) - Secure compute environment
 - [QuorumOS (QoS)](https://github.com/tkhq/qos) - Turnkey's secure enclave operating system
-- [Borsh Specification](https://borsh.io/)
-- [AWS Nitro Attestation](https://github.com/aws/aws-nitro-enclaves-nsm-api)
-- [Turnkey Documentation](https://docs.turnkey.com/)
+- [awsnitroverifier](https://github.com/anchorageoss/awsnitroverifier) - AWS Nitro attestation verification library
+- [Borsh Specification](https://borsh.io/) - Binary serialization format
+- [AWS Nitro Attestation](https://github.com/aws/aws-nitro-enclaves-nsm-api) - Nitro Security Module API
+- [Turnkey Documentation](https://docs.turnkey.com/) - Official Turnkey docs
 
 ## License
 
