@@ -3,14 +3,14 @@
 ## Executive Summary
 
 The VisualSign Protocol (VSP) provides cryptographically verifiable transaction parsing through AWS Nitro Enclaves, ensuring
-that transaction parsing occurs in a secure, isolated environment that a Hardware Security Module(HSM) or any other wallet can verify before signing a transactionf for a user. This guide demonstrates how wallets can incrementally integrate VSP verification, starting with basic signature validation and progressively adding stronger security guarantees.
+that transaction parsing occurs in a secure, isolated environment that a Hardware Security Module (HSM) or any other wallet can verify before signing a transaction for a user. This guide demonstrates how wallets can incrementally integrate VSP verification, starting with basic signature validation and progressively adding stronger security guarantees.
 
 ### Why VisualSign Protocol?
 
 VSP protects against:
 - Supply chain attacks on transaction parsing code (of course crates.io could get compromised)
 - Man-in-the-middle attacks on transaction data
-- Signing environment has the correct and authentic data to make decisions against (its worth noting that signing environment itself being safe is beyond scope of VisualSign)
+- Signing environment has the correct and authentic data to make decisions against (its worth noting that Bad data can be passed to Signing Environment, which would be beyond the scope of this tool)
 
 ### Incremental Integration Path
 
@@ -69,11 +69,9 @@ Transaction → API → Enclave → Parse → Sign → Return with:
 
 ### Overview
 
-Level 1 provides basic cryptographic verification that a transaction was signed by Turnkey's service. This level verifies 
-the ECDSA P256 signature from the ephemeral key generated inside the enclave.
+Level 1 provides basic cryptographic verification that a transaction was parsed by [VisualSign Parser](https://github.com/anchorageoss/visualsign-parser) running in Turnkey's turnkey infrastructure. This level verifies the ECDSA P256 signature from the ephemeral key generated inside the enclave.
 
-> **Note**: Input signature verification will be added in future versions to provide additional transaction integrity 
-guarantees.
+> **Note**: Input signature verification will be added in future versions to provide additional transaction integrity guarantees.
 
 ### What You Get
 
@@ -84,7 +82,7 @@ guarantees.
 
 ### What You Don't Get
 
-- ❌ No proof that signing happened in secure enclave
+- ❌ No proof that parsing happened in secure enclave
 - ❌ No verification of enclave configuration
 
 ### Implementation
@@ -697,24 +695,30 @@ for each (pcr_index, expected_hash) in approved_pcrs:
 - Limited blast radius if key somehow compromised
 - No long-term key storage in enclave
 - Cannot sign historical transactions with current key
-- Fresh key for each signing operation
+- Fresh key for each parsing operation
 
 #### Public Key Verification Order
 
 **CRITICAL**: Always verify attestation before trusting the public key
 
 ```
-// WRONG - trusts public key without attestation:
-public_key = extract_public_key(response.app_attestation)
-is_valid = verify_signature(public_key, message, signature) // INSECURE!
+// Extract attestations from API response
+	appAttestation, bootAttestationDoc, err := s.extractAttestations(response)
+	if err != nil {
+		return nil, err
+	}
 
-// CORRECT - attestation verified first:
-verify_boot_attestation(response)  // Level 2
-// Only after attestation verification, trust the public key
-public_key = extract_public_key(response.boot_attestation)[:65]
-is_valid = verify_signature(public_key, message, signature)
-verify_manifest(response, expected_pcrs, valid_pivot_hash)          // Level 3
+// ❌ Don'do this immediately
+pubkey := appAttestation.PublicKey[65:130]
+ecdsa.Verify(message)
 
+// ✅ Do this first
+// verify boot attstation
+_, err := attestationVerifier.Validate(bootAttestationDoc)
+if err !nil {
+    panic(err)
+}
+// then you can extract publickey, userdata and continue 
 ```
 
 The attestation verification proves that the public key was generated inside a legitimate enclave running authorized code.
@@ -729,80 +733,12 @@ The attestation verification proves that the public key was generated inside a l
 - TLS 1.3 required
 - Certificate validation enabled
 - Hostname verification enabled
----
 
-### Operational Security
-
-#### Monitoring and Alerting
-
-**Critical Events to Monitor**:
-
-1. **Manifest Changes**
-```
-if manifest_hash != expected_manifest_hash:
-    alert = {
-        severity: "WARNING",
-        type: "MANIFEST_CHANGE",
-        details: {
-            "expected": expected_manifest_hash,
-            "actual": manifest_hash
-        }
-    }
-    send_wallet_team_alert(alert)
-```
-
-This doesn't always mean security alert - something like new host may have been deployed
-
-2. **Verification Failures**
-```
-// Track failure rate using metrics
-metrics.increment_counter("verification.failure",
-    tags: {
-        "level": verification_level,
-        "reason": failure_reason
-    })
-
-if failure_rate > 0.01:  // 1% threshold
-    alert_security_team("High verification failure rate", failure_rate)
-```
-
-3. **PCR Mismatches**
-```
-if not validate_pcrs(attestation.pcrs):
-    // PCR mismatch is CRITICAL - could indicate compromise
-    send_security_alert({
-        severity: "CRITICAL",
-        type: "PCR_MISMATCH",
-        details: extract_pcr_details(attestation)
-    })
-    throw critical_error("SECURITY: PCR validation failed")
-```
-
-PCR3 is Role change, this could happen in future but I'd expect Turnkey to give notice here
-
-#### PCR and Manifest Management
-
-**Version Management**:
-```python
-pcr_set = {
-    pcr0: string,
-    pcr1: string,
-    pcr2: string,
-}
-
-approved_pcr_sets = [
-    {
-        pcr0: "f67076a8...",
-        pcr1: "bcdf05fe...",
-        pcr2: "4c495bf7...",
-    }
-]
-```
 
 **Update Process**:
 1. Receive notification of new manifest from service provider
-2. Verify new manifest through independent channel
-3. Add new manifest hash to approved list
+3. Verify new manifest through independent channel (usually rebuilding the OS)
+4. Add new manifest hash to approved list
 4. Deploy configuration update
 5. Monitor for successful transitions
 6. Remove old manifest after grace period
@@ -815,7 +751,7 @@ approved_pcr_sets = [
 
 **Mitigation**: AWS Nitro has undergone independent security audits. Monitor [AWS security bulletins](https://aws.amazon.com/security/) for updates.
 
-In future we expect to run [VisualSign Parser](https://github.com/anchorageoss/visualsign-parser)
+In future we expect to run [VisualSign Parser](https://github.com/anchorageoss/visualsign-parser) in other TEE environments too.
 
 #### 2. PCR3 Variability
 
@@ -827,13 +763,13 @@ In future we expect to run [VisualSign Parser](https://github.com/anchorageoss/v
 
 **Mitigation**: Use Level 3 with manifest Pivot.Hash for strongest binary verification guarantees
 
-#### 4. Build Reproducibility
+#### 4. Monolithic binary - all chains share one binary
 
-**Issue**: Exact binary reproducibility requires identical build environment
+**Issue**: All  the chains are implemented into a single binary
 
-**Current State**: visualsign-parser builds are not fully reproducible; must trust published hashes
+**Current State**: This means that any new chain addition includes all the dependencies required for decoding them. While this does increase the security surface area, this also means testing and building takes longer and longer
 
-**Future**: Work toward deterministic builds and multi-party verification
+**Future**: Consider splitting binaries/services - this will mean instead of single sha256sum to track, you have to include all the binaries like `visualsign-parser-solana` `visualsign-parser-ethereum` etc. 
 
 #### 5. No Input Signature Verification (Level 1)
 
@@ -859,7 +795,7 @@ Verified Through Attestation (Trust in Hardware):
 Not Trusted (Assume Hostile):
 ├── Network communication (until TLS verified)
 ├── Service provider infrastructure (until attestation verified)
-└── Any component not explicitly verified
+└── Any component not explicitly verified (including visualsign-parser if dependencies aren't verified)
 ```
 
 **Key Principle**: "Never trust, always verify" - All components are verified cryptographically through attestation chains rooted in AWS hardware.
@@ -911,45 +847,6 @@ For security concerns or vulnerability reports:
 
 ---
 
-## Production Deployment
-
-### Configuration Example
-
-```yaml
-verification:
-  level: 3  # 1, 2, or 3
-
-  # Level 2: PCR validation
-  approved_pcr_sets:
-    - pcr0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c"
-      pcr1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b"
-      pcr2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f"
-
-  # Level 3: Manifest validation
-  approved_manifest_hashes:
-    - "60d9c5754d6979afca7a5e75edfa43b629110301d8c57f9ff1718b74f70b5a9c"
-
-  # Expected binary hash
-  visualsign_parser_hash: "ef9f552a75bf22c7556b9900bae09f3557eb46f9123b00f94fe71baa8656e678"
-```
-
-### Monitoring
-
-```python
-// Track verification metrics
-metrics.increment_counter("wallet.verification.success", tags: {"level": "3"})
-metrics.increment_counter("wallet.verification.failure",
-    tags: {"level": "3", "reason": "pcr_mismatch"})
-metrics.record_histogram("wallet.verification.duration_ms", duration_value)
-
-// Alert on anomalies
-if manifest_hash != expected_hash:
-    metrics.increment_counter("wallet.security.manifest_change")
-    alert_security_team("Manifest changed", manifest_hash)
-```
-
----
-
 ## Reference Implementation
 
 The complete reference implementation is available at:
@@ -979,6 +876,7 @@ make build
   --key-name <your-key> \
   --unsigned-payload <base64-payload> \
   --qos-manifest-hex <expected-manifest-hash> \
+  -- pcrs 0:<hex>,1:<hex>
   --debug
 
 # Decode manifest for inspection

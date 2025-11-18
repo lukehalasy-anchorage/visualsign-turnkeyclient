@@ -67,10 +67,19 @@ type VerifyResult struct {
 	PCR4                    string                      `json:"pcr4,omitempty"`
 	UserData                []byte                      `json:"-"`
 	PCRs                    map[uint][]byte             `json:"-"`
+	PCRValidationResults    []PCRValidationResult       `json:"-"`
 	PublicKey               *ecdsa.PublicKey            `json:"-"`
 	Manifest                *manifest.Manifest          `json:"-"`
 	AttestationDocument     interface{}                 `json:"-"`
 	ManifestReserialization ManifestSerializationResult `json:"-"`
+}
+
+// PCRValidationResult represents the result of validating a single PCR
+type PCRValidationResult struct {
+	Index    uint   `json:"index"`
+	Expected string `json:"expected"`
+	Actual   string `json:"actual"`
+	Valid    bool   `json:"valid"`
 }
 
 // ManifestSerializationResult tracks manifest hash verification
