@@ -1,46 +1,32 @@
 # Wallet Integrators Guide to VisualSign Protocol (VSP)
 
-
-Note: this is an early document to get feedback from wallet developers, if you find any issues with the facts in this document or prose, let us know and we'll address them
-
-
 ## Executive Summary
-
 
 The VisualSign Protocol (VSP) provides cryptographically verifiable transaction parsing through AWS Nitro Enclaves, ensuring that transaction parsing occurs in a secure, isolated environment that a Hardware Security Module (HSM) or any other wallet can verify before signing a transaction for a user. This guide demonstrates how wallets can incrementally integrate VSP verification, starting with basic signature validation and progressively adding stronger security guarantees. This repository [visualsign-turnkeyclient](https://github.com/anchorageoss/visualsign-turnkeyclient) is a demonstration of using our very well tested client [awsnitroverifier](https://github.com/anchorageoss/awsnitroverifier) that shows that you can build a very minimal portable verifier for [visualsign-parser](https://github.com/anchorageoss/visualsign-parser) that for the most part only depends on two dependencies.
 
-
 * The Go stdlib - because of their excellent baked in cryptography libraries
-* [awsnitroverifier](https://github.com/anchorageoss/awsnitroverifier)
-   * [https://github.com/fxamacker/cbor/](https://github.com/fxamacker/cbor/) which is an excellent and well maintained CBOR implementation.
-We do use [github.com/urfave/cli/v3](github.com/urfave/cli/v3) for CLI but if you're using this as library or reference you can use the `flag` package from Go to keep you dependency even more minimal. We think this provides a very good starting point alongside Turnkey's [https://docs.rs/turnkey_proofs/latest/turnkey_proofs/](https://docs.rs/turnkey_proofs/latest/turnkey_proofs/) library for Rust to get started on how to integrate [visualsign-parser](https://github.com/anchorageoss/visualsign-parser) that cover a large part of modern Web3 development stacks.
+* [awsnitroverifier](https://github.com/anchorageoss/awsnitroverifier) 
+    * [https://github.com/fxamacker/cbor/](https://github.com/fxamacker/cbor/) which is an excellent and well maintained CBOR implementation.
+We do use [github.com/urfave/cli/v3](github.com/urfave/cli/v3) for CLI but if you're using this as library or reference you can use the `flag` package from Go to keep you dependency even more minimal. We think these 
 
-
-### Why VisualSign Protocol? 
-
+### Why VisualSign Protocol? for CLI but if you're using this as library or reference you can use the `flag` package from Go to keep you dependency even more minimal.
 
 VSP protects against:
-- Supply chain attacks on transaction parsing code 
+- Supply chain attacks on transaction parsing code (of course crates.io could get compromised)
 - Man-in-the-middle attacks on transaction data
 - Signing environment has the correct and authentic data to make decisions against (its worth noting that Bad data can be passed to Signing Environment, which would be beyond the scope of this tool)
 
-
 ### Incremental Integration Path
 
-
 Wallets can adopt VSP verification in three progressive levels (doesn't include the time to write good tests and code reviews):
-
 
 1. **Level 1**: Basic P256 signature verification (< day implementation for most wallets)
 2. **Level 2**: Boot attestation with PCR validation (3-5 days implementation)
 3. **Level 3**: Complete manifest verification (5-10 days implementation)
 
-
 Each level provides meaningful security improvements while allowing teams to balance implementation complexity against security requirements.
 
-
 ## Table of Contents
-
 
 1. [Architecture Overview](#architecture-overview)
 2. [Level 1: Basic P256 Signature Verification](#level-1-basic-p256-signature-verification)
@@ -51,101 +37,77 @@ Each level provides meaningful security improvements while allowing teams to bal
 7. [Production Deployment](#production-deployment)
 8. [Reference Implementation](#reference-implementation)
 
-
 ## Architecture Overview
-
 
 ### System Components
 
-
 ```
 [Wallet] → [Turnkey API] → [AWS Nitro Enclave]
-                              ├─ QuorumOS (QoS)
-                              ├─ visualsign-parser
-                              └─ Ephemeral P256 Key
-          ← [Parsed Transaction]
+                               ├─ QuorumOS (QoS)
+                               ├─ visualsign-parser
+                               └─ Ephemeral P256 Key
+           ← [Parsed Transaction]
 ```
-
 
 ### Key Components
 
-
 - **AWS Nitro Enclave**: Hardware-isolated compute environment that prevents even privileged users from accessing running code
 - **QuorumOS (QoS)**: Turnkey's secure operating system implementing threshold cryptography [GitHub Repo](https://github.com/tkhq/qos)
-- **visualsign-parser**: The application binary running inside the enclave
+- **visualsign-parser**: The application binary running inside the enclave 
 [GitHub Repo](https://github.com/anchorageoss/visualsign-parser)
 - **Attestations**: Cryptographic proofs of the enclave's configuration and operation
-- [Turnkey Verifiable Cloud](https://www.turnkey.com/turnkey-verifiable-cloud): You can sign up with Turnkey and get API key for your organization to get started with this library immediately
-
 
 ### Verification Flow
 
-
 ```
 Transaction → API → Enclave → Parse → Sign → Return with:
-                                              ├─ Parsed Transaction w/ Signed Metadata
-                                              ├─ App attestation (P256 signature)
-                                              ├─ Boot attestation (AWS Nitro document)
-                                              └─ QoS manifest
+                                               ├─ Parsed Transaction w/ Signed Metadata
+                                               ├─ App attestation (P256 signature)
+                                               ├─ Boot attestation (AWS Nitro document)
+                                               └─ QoS manifest
 ```
-
 
 ---
 
-
 ## Level 1: Basic P256 Signature Verification
-
 
 ### Overview
 
-
 Level 1 provides basic cryptographic verification that a transaction was parsed by [VisualSign Parser](https://github.com/anchorageoss/visualsign-parser) running in Turnkey's turnkey infrastructure. This level verifies the ECDSA P256 signature from the ephemeral key generated inside the enclave.
-
 
 > **Note**: Input signature verification will be added in future versions to provide additional transaction integrity guarantees.
 
-
 ### What You Get
-
 
 - ✅ Verification that transaction was parsed by some program running in Turnkey's Infrastructure; but no guarantee that it was generated by [VisualSign Parser](https://github.com/anchorageoss/visualsign-parser)
 - ✅ Protection against signature forgery
 - ✅ Basic integrity check on transaction data
 - ✅ Minimal implementation complexity
 
-
 ### What You Don't Get
-
 
 - ❌ No proof that parsing happened in secure enclave
 - ❌ No verification of enclave configuration
 
-
 ### Implementation
 
-
 #### Step 1: Call the API
-
 
 ```
 // Make API request to create signable payload
 request = {
-   unsignedPayload: base64_encode(transaction),
-   chain: "CHAIN_SOLANA"
+    unsignedPayload: base64_encode(transaction),
+    chain: "CHAIN_SOLANA"
 }
-
 
 response = turnkey_client.create_signable_payload(request)
 ```
 
-
 #### Step 2: Extract App Attestation
-
 
 ```
 // Parse the app attestation JSON
 app_attestation_json = response.attestations["app_attestation"]
-
 
 app_attestation = parse_json(app_attestation_json)
 // Result contains:
@@ -155,70 +117,54 @@ app_attestation = parse_json(app_attestation_json)
 //   - scheme: "SIGNATURE_SCHEME_TK_API_P256"
 ```
 
-
 #### Step 3: Handle the 130-byte Public Key Format
-
 
 The public key is returned as a 130-byte hex string containing two 65-byte uncompressed P256 public keys. Use the latter 65
 bytes for verification:
-
 
 ```
 // Decode the 130-character hex string to 130 bytes
 public_key_bytes = hex_decode(app_attestation.publicKey)
 assert length(public_key_bytes) == 130
 
-
 // Extract the latter 65 bytes (bytes 65-130)
 public_key_for_verification = public_key_bytes[65:130]
 
-
 // Verify it's an uncompressed P256 key (starts with 0x04)
 assert public_key_for_verification[0] == 0x04
-
 
 // Parse X and Y coordinates (32 bytes each after the 0x04 prefix)
 x_coordinate = bytes_to_integer(public_key_for_verification[1:33])
 y_coordinate = bytes_to_integer(public_key_for_verification[33:65])
 
-
 // Create P256 public key from coordinates
 public_key = create_p256_public_key(x_coordinate, y_coordinate)
 ```
 
-
 #### Step 4: Verify the Signature
-
 
 ```
 // Decode message and signature from hex
 message_bytes = hex_decode(app_attestation.message)
 signature_bytes = hex_decode(app_attestation.signature)
 
-
 // Compute SHA256 hash of the message
 message_hash = sha256(message_bytes)
-
 
 // Extract ECDSA signature components R and S (32 bytes each)
 r = bytes_to_integer(signature_bytes[0:32])
 s = bytes_to_integer(signature_bytes[32:64])
 
-
 // Verify ECDSA P256 signature
 is_valid = ecdsa_verify_p256(public_key, message_hash, r, s)
 
-
 if not is_valid:
-   throw error("signature verification failed")
-
+    throw error("signature verification failed")
 
 print("✓ Level 1: Signature verified successfully")
 ```
 
-
 #### Step 5: Return the Signable Payload (this is the payload we show to the user)
-
 
 ```
 // The signablePayload is ready to be shown to the user
@@ -226,44 +172,34 @@ parsed_transaction = response.signable_payload
 return parsed_transaction
 ```
 
-
 ### Testing Level 1
-
 
 ```
 test_level_1_verification():
-   // Test with known valid signature
-   public_key = "04...130 hex chars..."
-   message = "deadbeef..."
-   signature = "a1b2c3d4..."
+    // Test with known valid signature
+    public_key = "04...130 hex chars..."
+    message = "deadbeef..."
+    signature = "a1b2c3d4..."
 
+    is_valid = verify_p256_signature(public_key, message, signature)
+    assert is_valid == true
 
-   is_valid = verify_p256_signature(public_key, message, signature)
-   assert is_valid == true
-
-
-   // Test with tampered signature
-   tampered_signature = "00000000..."
-   is_valid = verify_p256_signature(public_key, message, tampered_signature)
-   assert is_valid == false
+    // Test with tampered signature
+    tampered_signature = "00000000..."
+    is_valid = verify_p256_signature(public_key, message, tampered_signature)
+    assert is_valid == false
 ```
-
 
 ---
 
-
 ## Level 2: Boot Attestation with PCR Validation
-
 
 ### Overview
 
-
-Level 2 adds cryptographic proof that transaction parsing occurred inside an AWS Nitro Enclave with specific software
+Level 2 adds cryptographic proof that transaction parsing occurred inside an AWS Nitro Enclave with specific software 
 configuration. This level verifies the boot attestation document and validates Platform Configuration Register (PCR) values.
 
-
 ### What You Get
-
 
 - ✅ All Level 1 guarantees
 - ✅ Cryptographic proof of enclave execution
@@ -271,12 +207,9 @@ configuration. This level verifies the boot attestation document and validates P
 - ✅ Protection against API compromise
 - ✅ AWS-signed attestation that cannot be forged
 
-
 ### Understanding PCR Values
 
-
 PCRs are SHA384 hashes that uniquely identify the enclave's software stack:
-
 
 | PCR | Measures | Purpose |
 |-----|----------|---------|
@@ -286,79 +219,63 @@ PCRs are SHA384 hashes that uniquely identify the enclave's software stack:
 | PCR3 | IAM role assigned to the parent instance| Ensures that the attestation process succeeds only when the parent instance has the correct IAM
 role. |
 
-
 ### Reference Implementation
 
-
 #### Step 1: Install AWS Nitro Verifier
-
 
 ```bash
 go get github.com/anchorageoss/awsnitroverifier@latest
 ```
 
-
 #### Step 2: Extract and Verify Boot Attestation
 
-
 Use a library like [awsnitroverifier](https://github.com/anchorageoss/awsnitroverifier) to verify the attestation:
-
 
 ```
 // Extract boot attestation from response
 boot_attestation_b64 = response.attestations["boot_attestation"]
 boot_attestation_string = base64_decode(boot_attestation_b64)
 
-
 // Create AWS Nitro verifier
 // Library reference: github.com/anchorageoss/awsnitroverifier
 verifier = aws_nitro_verifier.new_verifier({
-   skip_timestamp_check: false  // Enable timestamp validation
+    skip_timestamp_check: false  // Enable timestamp validation
 })
-
 
 // Validate attestation document
 // This verifies AWS signature, certificate chain, and timestamp
 validation_result = verifier.validate(boot_attestation_string)
 
-
 if not validation_result.valid:
-   throw error("attestation validation failed: " + validation_result.errors)
-
+    throw error("attestation validation failed: " + validation_result.errors)
 
 print("✓ Level 2: Boot attestation verified by AWS Nitro")
 ```
 
-
 #### Step 3: Validate PCR Values
-
 
 ```
 // Extract verified attestation document from validation result
 attestation_doc = validation_result.document
 
-
 // Define approved PCR values (SHA384 hashes as hex strings)
 // These values should be obtained from Turnkey documentation
 // or from your own enclave builds
 approved_pcrs = {
-   0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
-   1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
-   2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f",
-   // PCR3 is dynamic (contains IAM role) - either skip or validate pattern
+    0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
+    1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
+    2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f",
+    // PCR3 is dynamic (contains IAM role) - either skip or validate pattern
 }
-
 
 // Verify each PCR (PCRs are byte arrays in attestation_doc)
 for each (pcr_index, expected_hash) in approved_pcrs:
-   actual_pcr_bytes = attestation_doc.pcrs[pcr_index]
-   actual_hash = bytes_to_hex(actual_pcr_bytes)
+    actual_pcr_bytes = attestation_doc.pcrs[pcr_index]
+    actual_hash = bytes_to_hex(actual_pcr_bytes)
 
-
-   if actual_hash != expected_hash:
-       throw error("PCR[" + pcr_index + "] mismatch: expected " +
-                  expected_hash + ", got " + actual_hash)
-
+    if actual_hash != expected_hash:
+        throw error("PCR[" + pcr_index + "] mismatch: expected " +
+                   expected_hash + ", got " + actual_hash)
 
 print("✓ Level 2: All PCR values validated")
 print("  Module ID: " + attestation_doc.module_id)
@@ -366,69 +283,54 @@ print("  PCR0: " + bytes_to_hex(attestation_doc.pcrs[0])[0:16] + "...")
 print("  UserData: " + bytes_to_hex(attestation_doc.user_data))
 ```
 
-
 #### Step 4: Maintain PCR Allowlist
-
 
 ```
 // PCR values change when enclave software is updated
 // Implement a versioning strategy for transitions
 
-
 pcr_set = {
-   pcr0: string,
-   pcr1: string,
-   pcr2: string,
+    pcr0: string,
+    pcr1: string,
+    pcr2: string,
 }
 
-
 approved_pcr_sets = [
-   {
-       pcr0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
-       pcr1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
-       pcr2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f",
-   },
+    {
+        pcr0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
+        pcr1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
+        pcr2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f",
+    },
 ]
 
-
 function validate_pcrs(pcrs):
-   now = current_timestamp()
-   for each pcr_set in approved_pcr_sets:
-       if now >= pcr_set.valid_from and now < pcr_set.valid_until:
-           if matches_pcr_set(pcrs, pcr_set):
-               return success
+    now = current_timestamp()
+    for each pcr_set in approved_pcr_sets:
+        if now >= pcr_set.valid_from and now < pcr_set.valid_until:
+            if matches_pcr_set(pcrs, pcr_set):
+                return success
 
-
-   throw error("no matching PCR set found")
+    throw error("no matching PCR set found")
 ```
-
-
 
 
 ## Level 3: Complete Manifest Verification
 
-
 ### Overview
 
-
-Level 3 provides complete verification of the enclave configuration through the QuorumOS (QoS) manifest. This level
+Level 3 provides complete verification of the enclave configuration through the QuorumOS (QoS) manifest. This level 
 alidates that the specific visualsign-parser binary is running with the expected configuration and security policies.
 
-
 ### What You Get
-
 
 - ✅ All Level 1 & 2 guarantees
 - ✅ Verification of exact application binary (SHA256)
 - ✅ Protection against unauthorized manifest updates
 - ✅ Complete verification that expected code ran on genuine AWS Nitro instance
 
-
 ### Understanding the QoS Manifest
 
-
 The manifest is a Borsh-encoded security policy containing:
-
 
 ```
 Manifest Structure:
@@ -442,51 +344,41 @@ Manifest Structure:
 │   ├── PCR0-3: Expected PCR values
 │   └── QosCommit: Git commit of QuorumOS
 └── Quorum Sets
-   ├── ManifestSet: Who can update manifest
-   └── ShareSet: Key share holders
+    ├── ManifestSet: Who can update manifest
+    └── ShareSet: Key share holders
 ```
-
 
 ### Where to Find the SHA256sum
 
-
-The SHA256 hash of the visualsign-parser binary is stored in the **`Pivot.Hash`** field of the manifest. This 32-byte value
+The SHA256 hash of the visualsign-parser binary is stored in the **`Pivot.Hash`** field of the manifest. This 32-byte value 
 niquely identifies the exact application binary running in the enclave.
-
 
 ### Implementation
 
-
 #### Step 1: Extract Manifest from Response
-
 
 ```
 // Get manifest envelope (includes approval signatures)
 manifest_envelope_b64 = response.boot_proof.qos_manifest_envelope_b64
 
-
 // Also available: raw manifest without signatures
 raw_manifest_b64 = response.boot_proof.qos_manifest_b64
 ```
 
-
 #### Step 2: Decode Manifest from Borsh
 
-
 Use a Borsh deserialization library to decode the manifest. Reference implementation available at [github.com/anchorageoss/visualsign-turnkeyclient/manifest](https://github.com/anchorageoss/visualsign-turnkeyclient/tree/main/manifest):
-
 
 ```
 // Try to decode the manifest envelope (with approval signatures)
 // Returns: envelope, manifest_struct, manifest_bytes, envelope_bytes
 try:
-   envelope, manifest_struct, manifest_bytes, envelope_bytes =
-       borsh_decode_manifest_envelope_from_base64(manifest_envelope_b64)
+    envelope, manifest_struct, manifest_bytes, envelope_bytes =
+        borsh_decode_manifest_envelope_from_base64(manifest_envelope_b64)
 catch decoding_error:
-   // Fall back to raw manifest if envelope decode fails
-   manifest_struct, manifest_bytes =
-       borsh_decode_raw_manifest_from_base64(raw_manifest_b64)
-
+    // Fall back to raw manifest if envelope decode fails
+    manifest_struct, manifest_bytes =
+        borsh_decode_raw_manifest_from_base64(raw_manifest_b64)
 
 // manifest_struct now contains:
 //   - namespace.name: string (e.g., "anchorageoss/visualsign-parser")
@@ -497,125 +389,100 @@ catch decoding_error:
 //   - enclave.qos_commit: QuorumOS git commit hash
 ```
 
-
 #### Step 3: Verify Manifest Hash Against UserData
 
-
 The UserData field in the boot attestation contains the SHA256 hash of the manifest:
-
 
 ```
 // Compute SHA256 hash of the manifest bytes
 manifest_hash = sha256(manifest_bytes)
 manifest_hash_hex = bytes_to_hex(manifest_hash)
 
-
 // Get UserData from boot attestation (from Level 2)
 user_data_hex = bytes_to_hex(attestation_doc.user_data)
 
-
 // Verify they match
 if manifest_hash_hex != user_data_hex:
-   throw error("manifest hash mismatch: computed " + manifest_hash_hex +
-               ", attestation has " + user_data_hex)
-
+    throw error("manifest hash mismatch: computed " + manifest_hash_hex +
+                ", attestation has " + user_data_hex)
 
 print("✓ Level 3: Manifest hash verified against boot attestation")
 ```
 
-
 #### Step 4: Validate visualsign-parser Binary Hash
-
 
 ```
 // Extract the SHA256 hash of visualsign-parser binary from manifest
 pivot_hash = bytes_to_hex(manifest_struct.pivot.hash)
 print("visualsign-parser SHA256: " + pivot_hash)
 
-
 // Verify against expected hash
 // This hash can be computed independently by building visualsign-parser
 expected_binary_hash = "ef9f552a75bf22c7556b9900bae09f3557eb46f9123b00f94fe71baa8656e678"
 if pivot_hash != expected_binary_hash:
-   throw error("visualsign-parser binary hash mismatch")
-
+    throw error("visualsign-parser binary hash mismatch")
 
 // Verify namespace matches expected value
 expected_namespace = "anchorageoss/visualsign-parser"
 if manifest_struct.namespace.name != expected_namespace:
-   throw error("unexpected namespace: " + manifest_struct.namespace.name)
-
+    throw error("unexpected namespace: " + manifest_struct.namespace.name)
 
 print("✓ Level 3: visualsign-parser binary verified")
 ```
 
-
 #### Step 5: Validate PCRs from Manifest
-
 
 ```
 // Compare manifest PCRs with attestation PCRs
 manifest_pcrs = {
-   0: manifest_struct.enclave.pcr0,
-   1: manifest_struct.enclave.pcr1,
-   2: manifest_struct.enclave.pcr2,
-   3: manifest_struct.enclave.pcr3
+    0: manifest_struct.enclave.pcr0,
+    1: manifest_struct.enclave.pcr1,
+    2: manifest_struct.enclave.pcr2,
+    3: manifest_struct.enclave.pcr3
 }
 
-
 for each (pcr_index, expected_pcr_bytes) in manifest_pcrs:
-   actual_pcr_bytes = attestation_doc.pcrs[pcr_index]
+    actual_pcr_bytes = attestation_doc.pcrs[pcr_index]
 
-
-   if expected_pcr_bytes != actual_pcr_bytes:
-       throw error("PCR[" + pcr_index + "] mismatch between manifest and attestation")
-
+    if expected_pcr_bytes != actual_pcr_bytes:
+        throw error("PCR[" + pcr_index + "] mismatch between manifest and attestation")
 
 print("✓ Level 3: All PCRs match between manifest and attestation")
 ```
 
-
 #### Step 6: Monitor Manifest Updates
-
 
 ```
 // Store and monitor manifest hashes for changes
 manifest_tracker = {
-   current_hash: string,
-   previous_hash: string,
-   last_updated: timestamp
+    current_hash: string,
+    previous_hash: string,
+    last_updated: timestamp
 }
 
-
 function check_manifest_update(new_hash):
-   if new_hash != manifest_tracker.current_hash:
-       // Manifest has changed!
-       log_warning("MANIFEST UPDATE DETECTED",
-           "previous": manifest_tracker.current_hash,
-           "new": new_hash,
-           "timestamp": current_timestamp())
+    if new_hash != manifest_tracker.current_hash:
+        // Manifest has changed!
+        log_warning("MANIFEST UPDATE DETECTED",
+            "previous": manifest_tracker.current_hash,
+            "new": new_hash,
+            "timestamp": current_timestamp())
 
+        // Alert security team
+        alert_security_team("Manifest updated", new_hash)
 
-       // Alert security team
-       alert_security_team("Manifest updated", new_hash)
+        // Require manual approval before accepting
+        if not approve_manifest_update(new_hash):
+            throw critical_error("Unapproved manifest update")
 
-
-       // Require manual approval before accepting
-       if not approve_manifest_update(new_hash):
-           throw critical_error("Unapproved manifest update")
-
-
-       manifest_tracker.previous_hash = manifest_tracker.current_hash
-       manifest_tracker.current_hash = new_hash
-       manifest_tracker.last_updated = current_timestamp()
+        manifest_tracker.previous_hash = manifest_tracker.current_hash
+        manifest_tracker.current_hash = new_hash
+        manifest_tracker.last_updated = current_timestamp()
 ```
-
 
 ### Reproducing the SHA256
 
-
 To independently verify the visualsign-parser binary hash:
-
 
 ```bash
 # Clone and build visualsign-parser
@@ -623,58 +490,45 @@ git clone https://github.com/anchorageoss/visualsign-parser
 cd visualsign-parser
 make build
 
-
 # Compute SHA256
 sha256sum build/visualsign-parser
 # Output: ef9f552a75bf22c7556b9900bae09f3557eb46f9123b00f94fe71baa8656e678
 
-
 # This hash should match Pivot.Hash in the manifest
 ```
 
-
 ---
-
 
 ## API Documentation
 
-
 ### Authentication
 
-
 Turnkey API uses ECDSA P256 signatures for authentication:
-
 
 ```
 // Generate authentication stamp for API request
 function generate_auth_stamp(private_key, request_body_bytes):
-   // Hash the request body
-   hash = sha256(request_body_bytes)
+    // Hash the request body
+    hash = sha256(request_body_bytes)
 
+    // Sign with ECDSA P256 private key
+    r, s = ecdsa_sign_p256(private_key, hash)
 
-   // Sign with ECDSA P256 private key
-   r, s = ecdsa_sign_p256(private_key, hash)
+    // Encode signature (R and S components concatenated)
+    signature = concatenate_bytes(r, s)
 
+    // Create stamp JSON structure
+    stamp = {
+        "publicKey": bytes_to_hex(compress_public_key(private_key.public_key)),
+        "signature": bytes_to_hex(signature),
+        "scheme": "SIGNATURE_SCHEME_TK_API_P256"
+    }
 
-   // Encode signature (R and S components concatenated)
-   signature = concatenate_bytes(r, s)
-
-
-   // Create stamp JSON structure
-   stamp = {
-       "publicKey": bytes_to_hex(compress_public_key(private_key.public_key)),
-       "signature": bytes_to_hex(signature),
-       "scheme": "SIGNATURE_SCHEME_TK_API_P256"
-   }
-
-
-   stamp_json = json_encode(stamp)
-   return base64_encode(stamp_json)
+    stamp_json = json_encode(stamp)
+    return base64_encode(stamp_json)
 ```
 
-
 ### API Endpoints
-
 
 **Create Signable Payload**
 ```
@@ -683,61 +537,49 @@ Host: api.turnkey.com
 Content-Type: application/json
 X-Stamp: <authentication-stamp>
 
-
 {
- "unsignedPayload": "<base64|hex-transaction>",
- "chain": "CHAIN_NAME"
+  "unsignedPayload": "<base64|hex-transaction>",
+  "chain": "CHAIN_NAME"
 }
 ```
-
 
 **Response Structure**
 ```json
 {
- "signablePayload": "<hex-signed-transaction>",
- "attestations": {
-   "app_attestation": "<json-p256-signature>",
-   "boot_attestation": "<base64-nitro-document>"
- },
- "bootProof": {
-   "qosManifestB64": "<base64-raw-manifest>",
-   "qosManifestEnvelopeB64": "<base64-manifest-with-signatures>"
- }
+  "signablePayload": "<hex-signed-transaction>",
+  "attestations": {
+    "app_attestation": "<json-p256-signature>",
+    "boot_attestation": "<base64-nitro-document>"
+  },
+  "bootProof": {
+    "qosManifestB64": "<base64-raw-manifest>",
+    "qosManifestEnvelopeB64": "<base64-manifest-with-signatures>"
+  }
 }
 ```
 
-
 ---
-
 
 ## Security Considerations
 
-
 ### Overview
-
 
 This section covers security considerations specific to the VisualSign Protocol. For general application security practices, refer to:
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [OWASP Cryptographic Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)
 - [OWASP API Security Top 10](https://owasp.org/www-project-api-security/)
 
-
 ### Reference Implementation
 
-
 The complete verification implementation is available in the [`verify/service.go`](https://github.com/anchorageoss/visualsign-turnkeyclient/blob/24886a1a9e5cb4f39b8f88cd9c0ef31603074683/verify/service.go) file. Key verification steps:
-
 
 - [Boot attestation validation](https://github.com/anchorageoss/visualsign-turnkeyclient/blob/24886a1a9e5cb4f39b8f88cd9c0ef31603074683/verify/service.go#L95-L109) (Level 2)
 - [Manifest processing and hash verification](https://github.com/anchorageoss/visualsign-turnkeyclient/blob/24886a1a9e5cb4f39b8f88cd9c0ef31603074683/verify/service.go#L251-L343) (Level 3)
 - [ECDSA signature verification](https://github.com/anchorageoss/visualsign-turnkeyclient/blob/24886a1a9e5cb4f39b8f88cd9c0ef31603074683/verify/service.go#L150-L160) (All levels)
 
-
 ---
 
-
 ### Security Comparison by Level
-
 
 | Threat | Level 1 | Level 2 | Level 3 |
 |--------|---------|---------|---------|
@@ -748,34 +590,24 @@ The complete verification implementation is available in the [`verify/service.go
 | Unauthorized Updates | ❌ Vulnerable | ❌ Vulnerable | ✅ Protected |
 
 
-
-
 ---
-
 
 ### Cryptographic Guarantees
 
-
 #### ECDSA P256 Signatures
 
-
 **Algorithm**: ECDSA with P-256 curve (secp256r1)
-
 
 **Security Properties**:
 - **Unforgeability**: Cannot create valid signature without private key
 - **Non-repudiation**: Signature proves transaction was signed by specific key
 - **Integrity**: Any modification invalidates signature
 
-
 **Key Generation**: Ephemeral key pair generated inside Nitro Enclave at session start
-
 
 **Strength**: 128-bit security level (equivalent to 3072-bit RSA)
 
-
 #### SHA256 and SHA384 Hashing
-
 
 **Usage**:
 - Manifest integrity (UserData field) - SHA256
@@ -783,23 +615,18 @@ The complete verification implementation is available in the [`verify/service.go
 - PCR measurements - SHA384
 - Message hashing for ECDSA signatures - SHA256
 
-
 **Strength**: 128-bit and 192-bit security levels respectively
-
 
 #### AWS Nitro Attestation Document
 
-
 **Signature Algorithm**: RSA-4096 with SHA384
-
 
 **Certificate Chain**:
 ```
 AWS Root CA
- └─ AWS Nitro Attestation CA (region-specific)
-     └─ Enclave-specific certificate (ephemeral)
+  └─ AWS Nitro Attestation CA (region-specific)
+      └─ Enclave-specific certificate (ephemeral)
 ```
-
 
 **Security Properties**:
 - Root certificate embedded in AWS Nitro Verifier library
@@ -807,18 +634,13 @@ AWS Root CA
 - PCR values measured by hardware, not software
 - Timestamp prevents replay attacks
 
-
 **Documentation**: See [Turnkey Boot Proofs](https://docs.rs/turnkey_proofs/latest/turnkey_proofs/#boot-proofs) for detailed attestation structure.
-
 
 ---
 
-
 ### Understanding PCR Measurements
 
-
 PCR (Platform Configuration Register) values are SHA-384 hashes that uniquely identify the enclave's configuration. According to the [AWS Nitro Enclaves documentation](https://docs.aws.amazon.com/pdfs/enclaves/latest/user/enclaves-user.pdf):
-
 
 | PCR | Measures | Security Property |
 |-----|----------|-------------------|
@@ -827,17 +649,13 @@ PCR (Platform Configuration Register) values are SHA-384 hashes that uniquely id
 | **PCR2** | Hash over subsequent ramdisk sections | Confirms additional components |
 | **PCR3** | IAM role + Instance ID | Ties to AWS identity (dynamic) |
 
-
 #### Important PCR Limitations
 
-
 As documented in the [Trail of Bits analysis](https://blog.trailofbits.com/2024/02/16/a-few-notes-on-aws-nitro-enclaves-images-and-attestation/), PCR measurements have limitations:
-
 
 - **Section Concatenation**: PCRs concatenate section data without domain separation, meaning "bytes can be moved between adjacent sections without changing PCRs"
 - **Metadata Exclusion**: The metadata section of EIF files is not attested
 - **Parser Discrepancies**: The public `nitro-cli describe-eif` parser may differ from the hypervisor parser
-
 
 **Security Recommendations**:
 1. Verify PCR0, PCR1, and PCR2 together (not in isolation)
@@ -845,99 +663,78 @@ As documented in the [Trail of Bits analysis](https://blog.trailofbits.com/2024/
 3. Skip PCR3 validation as it changes per instance
 4. Do not rely solely on PCRs for binary identification - use manifest Pivot.Hash
 
-
 #### PCR Verification in Practice
-
 
 ```
 // Level 2: Validate PCRs from attestation
 // See: https://github.com/anchorageoss/visualsign-turnkeyclient/blob/24886a1a9e5cb4f39b8f88cd9c0ef31603074683/verify/service.go#L107
 result.pcrs = validation_result.document.pcrs
 
-
 // Define approved PCR values (PCR0, PCR1, PCR2)
 approved_pcrs = {
-   0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
-   1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
-   2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f"
+    0: "f67076a8f9796b90d7f0eb148ec6926f66fe04c80861151916961f7dec715b3c",
+    1: "bcdf05fefccaa8e55bf2c8d6dee9e79bbff31e34bf28a99aa19e6b29c37ee80b",
+    2: "4c495bf7c91e69f0aced18c8f7f6b9038e3aaa5c4b8a4e6d5b9b7ee1e55c5e3f"
 }
-
 
 // Verify each PCR
 for each (pcr_index, expected_hash) in approved_pcrs:
-   actual_hash = bytes_to_hex(attestation_doc.pcrs[pcr_index])
-   if actual_hash != expected_hash:
-       throw error("PCR[" + pcr_index + "] mismatch")
+    actual_hash = bytes_to_hex(attestation_doc.pcrs[pcr_index])
+    if actual_hash != expected_hash:
+        throw error("PCR[" + pcr_index + "] mismatch")
 ```
-
 
 ---
 
-
 ### Key Management
 
-
 #### Ephemeral Key Lifecycle
-
 
 **Generation**: Inside Nitro Enclave at session start
 **Usage**: Sign single transaction or batch
 **Destruction**: Automatically destroyed when enclave terminates
 **Rotation**: New key pair for each session
 
-
 **Security Benefits**:
 - Limited blast radius if key is somehow compromised
 - Cannot sign historical transactions with current key
 
-
 #### Public Key Verification Order
-
 
 **CRITICAL**: Always verify attestation before trusting the public key
 
-
 ```
 // Extract attestations from API response
-   appAttestation, bootAttestationDoc, err := s.extractAttestations(response)
-   if err != nil {
-       return nil, err
-   }
-
+	appAttestation, bootAttestationDoc, err := s.extractAttestations(response)
+	if err != nil {
+		return nil, err
+	}
 
 // ❌ Don'do this immediately
 pubkey := appAttestation.PublicKey[65:130]
 ecdsa.Verify(message)
 
-
 // ✅ Do this first
 // verify boot attstation
 _, err := attestationVerifier.Validate(bootAttestationDoc)
 if err !nil {
-   panic(err)
+    panic(err)
 }
-// then you can extract publickey, userdata and continue
+// then you can extract publickey, userdata and continue 
 ```
-
 
 The attestation verification proves that the public key was generated inside a legitimate enclave running authorized code.
 
-
 ---
-
 
 ### Network Security
 
-
 #### TLS Configuration
-
 
 **Requirements**:
 - TLS 1.3 required
 - Certificate validation enabled
 - Hostname verification enabled
-
-
 
 
 **Update Process**:
@@ -948,60 +745,41 @@ The attestation verification proves that the public key was generated inside a l
 5. Monitor for successful transitions
 6. Remove old manifest after grace period
 
-
 ### Known Limitations
-
 
 #### 1. Trust in AWS Nitro Hardware
 
-
 **Assumption**: AWS Nitro hardware is not compromised
-
 
 **Mitigation**: AWS Nitro has undergone independent security audits. [AWS Nitro Security Design](https://docs.aws.amazon.com/pdfs/whitepapers/latest/security-design-of-aws-nitro-system/security-design-of-aws-nitro-system.pdf) goes more into it. Monitor [AWS security bulletins](https://aws.amazon.com/security/) for updates.
 
-
-In future we expect to run [VisualSign Parser](https://github.com/anchorageoss/visualsign-parser) in other TEE environments too.
-
+In future we expect to run [VisualSign Parser](https://github.com/anchorageoss/visualsign-parser) in other TEE environments too. If you are an expert at environments other than AWS Nitro, we would love to learn more from you.
 
 #### 2. PCR3 Variability
 
-
-**Issue**: PCR3 includes hash of the IAM Role, which are dynamic per enclave instance. In practice this has been static for us.
-
+**Issue**: PCR3 includes `agghash of the IAM Role, which are dynamic per enclave instance. In practice this has been static for us.
 
 #### 3. PCR Limitations
 
-
 **Issue**: As noted in the [Trail of Bits analysis](https://blog.trailofbits.com/2024/02/16/a-few-notes-on-aws-nitro-enclaves-images-and-attestation/), PCRs have structural limitations with section concatenation
-
 
 **Mitigation**: Use Level 3 with manifest Pivot.Hash for strongest binary verification guarantees
 
-
 #### 4. Monolithic binary - all chains share one binary
-
 
 **Issue**: All  the chains are implemented into a single binary
 
-
 **Current State**: This means that any new chain addition includes all the dependencies required for decoding them. While this does increase the security surface area, this also means testing and building takes longer and longer
 
-
-**Future**: Consider splitting binaries/services - this will mean instead of single sha256sum to track, you have to include all the binaries like `visualsign-parser-solana` `visualsign-parser-ethereum` etc.
-
+**Future**: Consider splitting binaries/services - this will mean instead of single sha256sum to track, you have to include all the binaries like `visualsign-parser-solana` `visualsign-parser-ethereum` etc. 
 
 #### 5. No Input Signature Verification (Level 1)
 
-
 **Current State**: Input signature verification not yet implemented in Level 1
-
 
 **Roadmap**: Future versions will include input signature verification
 
-
 ### Trust Model
-
 
 ```
 Fully Trusted (Required for Security):
@@ -1010,13 +788,11 @@ Fully Trusted (Required for Security):
 ├── Your verification code
 └── Operating system running verification
 
-
 Verified Through Attestation (Trust in Hardware):
 ├── Service provider API (verified via attestation)
 ├── QuorumOS manifest (verified via UserData)
 ├── visualsign-parser binary (verified via Pivot.Hash)
 └── Enclave configuration (verified via PCRs)
-
 
 Not Trusted (Assume Hostile):
 ├── Network communication (until TLS verified)
@@ -1024,22 +800,17 @@ Not Trusted (Assume Hostile):
 └── Any component not explicitly verified (including visualsign-parser if dependencies aren't verified)
 ```
 
-
 **Key Principle**: "Never trust, always verify" - All components are verified cryptographically through attestation chains rooted in AWS hardware.
-
 
 ---
 
-
 ### Best Practices Summary
-
 
 #### Development Phase
 ✅ Start with Level 1 for initial integration
 ✅ Write comprehensive tests for all verification levels
 ✅ Use testnet for testing
 ✅ Implement proper error handling
-
 
 #### Production Deployment
 ✅ **Use Level 2 minimum**, Level 3 strongly recommended
@@ -1049,7 +820,6 @@ Not Trusted (Assume Hostile):
 ✅ Maintain approved PCR/manifest lists
 ✅ Document security procedures
 
-
 #### Production Operations
 ✅ Monitor verification success rates
 ✅ Alert on manifest changes
@@ -1057,102 +827,81 @@ Not Trusted (Assume Hostile):
 ✅ Coordinate with service provider on updates
 ✅ Annual security assessments
 
-
 ---
 
-
 ### Additional Security Resources
-
 
 - **AWS Nitro Enclaves**: [Official Documentation (PDF)](https://docs.aws.amazon.com/pdfs/enclaves/latest/user/enclaves-user.pdf)
 - **Turnkey Boot Proofs**: [turnkey_proofs Rust crate documentation](https://docs.rs/turnkey_proofs/latest/turnkey_proofs/#boot-proofs)
 - **PCR Analysis**: [Trail of Bits: AWS Nitro Enclaves Images and Attestation](https://blog.trailofbits.com/2024/02/16/a-few-notes-on-aws-nitro-enclaves-images-and-attestation/)
 - **Reference Implementation**: [visualsign-turnkeyclient on GitHub](https://github.com/anchorageoss/visualsign-turnkeyclient)
 
-
 ---
 
-
 ### Security Contact
-
 
 For security concerns or vulnerability reports:
 - **visualsign-turnkeyclient**: [GitHub Security Advisories](https://github.com/anchorageoss/visualsign-turnkeyclient/security)
 - **Turnkey API**: Contact Turnkey support
 - **AWS Nitro**: [AWS Security Center](https://aws.amazon.com/security/)
 
-
 **Responsible Disclosure**: Report security vulnerabilities privately before public disclosure
-
 
 ---
 
-
 ## Reference Implementation
-
 
 The complete reference implementation is available at:
 https://github.com/anchorageoss/visualsign-turnkeyclient
 
-
 ### Key Files
-
 
 - `verify/service.go`: Core verification logic for all levels
 - `manifest/parser.go`: Borsh deserialization for Level 3
 - `manifest/types.go`: Manifest structure definitions
 - `cmd/verify.go`: CLI command implementation
 
-
 ### Running the Reference
-
 
 ```bash
 # Clone the repository
 git clone https://github.com/anchorageoss/visualsign-turnkeyclient
 cd visualsign-turnkeyclient
 
-
 # Build
 make build
 
-
 # Run verification (all levels)
 ./bin/visualsign-turnkeyclient verify \
- --host https://api.turnkey.com \
- --organization-id <your-org-id> \
- --key-name <your-key> \
- --unsigned-payload <base64-payload> \
- --qos-manifest-hex <expected-manifest-hash> \
- -- pcrs 0:<hex>,1:<hex>
- --debug
-
+  --host https://api.turnkey.com \
+  --organization-id <your-org-id> \
+  --key-name <your-key> \
+  --unsigned-payload <base64-payload> \
+  --qos-manifest-hex <expected-manifest-hash> \
+  -- pcrs 0:<hex>,1:<hex>
+  --debug
 
 # Decode manifest for inspection
 ./bin/visualsign-turnkeyclient decode-manifest envelope \
- --file manifest.bin --json
-
+  --file manifest.bin --json
 
 ```
 
-
 You can also run this code against qos_client from turnkey using `./verify-manifest.sh` (Soon to be migrated to a nightly job)
 
-
 ### Testing
-
 
 ```bash
 # Run unit tests
 make test
-```
 
+# Run with test vectors
+go test ./verify -run TestVerificationLevels
+```
 
 ---
 
-
 ## Additional Resources
-
 
 - **visualsign-parser**: https://github.com/anchorageoss/visualsign-parser
 - **QuorumOS Documentation**: https://github.com/tkhq/qos
@@ -1160,15 +909,11 @@ make test
 - **Turnkey Documentation**: https://docs.turnkey.com/
 - **Reference Client**: https://github.com/anchorageoss/visualsign-turnkeyclient
 
-
 ---
-
 
 ## Quick Decision Guide
 
-
 Choose your integration level based on:
-
 
 | Factor | Level 1 | Level 2 | Level 3 |
 |--------|---------|---------|---------|
@@ -1178,21 +923,15 @@ Choose your integration level based on:
 | **Regulatory Compliance** | No | Limited | Yes |
 | **Trust Model** | Trust Turnkey | Trust AWS | Trust AWS + Hardware Manufacturer |
 
-
 ---
 
-
 ## Support
-
 
 For questions or issues:
 - Open an issue on the reference implementation repository
 - Contact Turnkey support for API-related questions
 - Review the QuorumOS documentation for manifest details
 
-
 ---
 
-
 *This guide is maintained by the VisualSign Protocol team and updated regularly as the protocol evolves.*
-
