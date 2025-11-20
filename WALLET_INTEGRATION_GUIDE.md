@@ -14,7 +14,7 @@ We do use [github.com/urfave/cli/v3](github.com/urfave/cli/v3) for CLI but if yo
 VSP protects against:
 - Supply chain attacks on transaction parsing code (of course crates.io could get compromised)
 - Man-in-the-middle attacks on transaction data
-- Signing environment has the correct and authentic data to make decisions against (its worth noting that Bad data can be passed to Signing Environment, which would be beyond the scope of this tool)
+- Signing environment has the correct and authentic data to make decisions against (it's worth noting that bad data can be passed to Signing Environment, which would be beyond the scope of this tool)
 
 ### Incremental Integration Path
 
