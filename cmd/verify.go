@@ -61,6 +61,10 @@ func VerifyCommand() *cli.Command {
 				Name:  "debug",
 				Usage: "Enable debug output (attestation document, PCR values, manifest details)",
 			},
+			&cli.StringFlag{
+				Name:  "pcrs",
+				Usage: "Expected PCR values in format: 0:<hex>,1:<hex>,... (e.g., 0:abc123,1:def456)",
+			},
 		},
 		Action: runVerifyCommand,
 	}
@@ -77,6 +81,13 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 	saveManifestPath := cmd.String("save-qos-manifest")
 	chain := cmd.String("chain")
 	debug := cmd.Bool("debug")
+	pcrsSpec := cmd.String("pcrs")
+
+	// Parse PCR rules if provided
+	pcrRules, err := ParsePCRs(pcrsSpec)
+	if err != nil {
+		return fmt.Errorf("failed to parse PCR specification: %w", err)
+	}
 
 	// Create API client
 	httpClient := &http.Client{}
@@ -89,6 +100,7 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 	// Create attestation verifier
 	verifier := nitroverifier.NewVerifier(nitroverifier.AWSNitroVerifierOptions{
 		SkipTimestampCheck: true,
+		PCRRules:           pcrRules,
 	})
 
 	// Create verification service
@@ -106,6 +118,9 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("verification failed: %w", err)
 	}
 
+	// Create formatter for output
+	formatter := verify.NewFormatter()
+
 	// Print to stderr for debugging/logging
 	fmt.Fprintf(os.Stderr, "\n=== STEP 1: API Response Received ===\n")
 	fmt.Fprintf(os.Stderr, "✓ Received boot attestation document\n")
@@ -117,8 +132,10 @@ func runVerifyCommand(ctx context.Context, cmd *cli.Command) error {
 	fmt.Fprintf(os.Stderr, "✓ Module ID: %s\n", result.ModuleID)
 	fmt.Fprintf(os.Stderr, "✓ PCRs verified: %d PCRs found\n", len(result.PCRs))
 
-	// Format and print PCR values
-	formatter := verify.NewFormatter()
+	// Display PCR validation results if any PCR rules were provided
+	if len(result.PCRValidationResults) > 0 {
+		fmt.Fprint(os.Stderr, formatter.FormatPCRValidationResults(result.PCRValidationResults, ""))
+	}
 
 	// Print debug information if requested
 	if debug {

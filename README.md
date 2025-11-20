@@ -7,7 +7,7 @@ A Go client for Turnkey's Visualsign API that provides end-to-end verification o
 
 ## Features
 
-- Parse Solana transactions via Turnkey's Visualsign API
+- Parse blockchain transactions via Turnkey's Visualsign API - the CLI doesn't need to be updated when a new chain support is added
 - Verify AWS Nitro enclave attestations
 - Decode and display QoS ([QuorumOS](https://github.com/tkhq/qos)) manifests
 - Validate signatures from ephemeral keys

@@ -102,11 +102,24 @@ func (s *Service) Verify(ctx context.Context, req *VerifyRequest) (*VerifyResult
 		return nil, fmt.Errorf("attestation document validation failed: %v", validationResult.Errors)
 	}
 
-	result.AttestationValid = true
+	result.AttestationValid = validationResult.Valid
 	result.ModuleID = validationResult.Document.ModuleID
 	result.PCRs = validationResult.Document.PCRs
 	result.UserData = validationResult.Document.UserData
 	result.AttestationDocument = validationResult.Document
+
+	// Capture PCR validation results if any PCR rules were provided
+	if len(validationResult.PCRResults) > 0 {
+		result.PCRValidationResults = make([]PCRValidationResult, len(validationResult.PCRResults))
+		for i, pcrResult := range validationResult.PCRResults {
+			result.PCRValidationResults[i] = PCRValidationResult{
+				Index:    pcrResult.Index,
+				Expected: hex.EncodeToString(pcrResult.Expected),
+				Actual:   hex.EncodeToString(pcrResult.Actual),
+				Valid:    pcrResult.Valid,
+			}
+		}
+	}
 
 	// Extract and set QoS manifest hash from UserData early, so it's available
 	// even if manifest processing fails later

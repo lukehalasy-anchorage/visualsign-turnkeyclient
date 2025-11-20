@@ -180,6 +180,29 @@ func (f *Formatter) FormatApprovals(approvals []manifest.Approval) []map[string]
 	return result
 }
 
+// FormatPCRValidationResults formats PCR validation results for display
+func (f *Formatter) FormatPCRValidationResults(results []PCRValidationResult, indent string) string {
+	if len(results) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\n%sPCR Validation Results:\n", indent))
+
+	for _, result := range results {
+		status := "✅ PASS"
+		if !result.Valid {
+			status = "❌ FAIL"
+		}
+
+		sb.WriteString(fmt.Sprintf("%s  PCR[%d]: %s\n", indent, result.Index, status))
+		sb.WriteString(fmt.Sprintf("%s    Expected: %s\n", indent, result.Expected))
+		sb.WriteString(fmt.Sprintf("%s    Actual:   %s\n", indent, result.Actual))
+	}
+
+	return sb.String()
+}
+
 // FormatVerificationResult formats a verification result for display
 func (f *Formatter) FormatVerificationResult(result *VerifyResult) map[string]interface{} {
 	output := map[string]interface{}{
@@ -201,6 +224,20 @@ func (f *Formatter) FormatVerificationResult(result *VerifyResult) map[string]in
 
 	if result.PCR4 != "" {
 		output["pcr4"] = result.PCR4
+	}
+
+	// Add PCR validation results if present
+	if len(result.PCRValidationResults) > 0 {
+		pcrResults := make([]map[string]interface{}, len(result.PCRValidationResults))
+		for i, pcr := range result.PCRValidationResults {
+			pcrResults[i] = map[string]interface{}{
+				"index":    pcr.Index,
+				"expected": pcr.Expected,
+				"actual":   pcr.Actual,
+				"valid":    pcr.Valid,
+			}
+		}
+		output["pcrValidations"] = pcrResults
 	}
 
 	return output
