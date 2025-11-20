@@ -756,7 +756,7 @@ for each (pcr_index, expected_hash) in approved_pcrs:
 		return nil, err
 	}
 
-// ❌ Don'do this immediately
+// ❌ Don't do this immediately
 pubkey := appAttestation.PublicKey[65:130]
 ecdsa.Verify(message)
 
