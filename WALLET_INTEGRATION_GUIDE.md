@@ -340,7 +340,7 @@ func matchesPCRSet(actualPCRs map[int][]byte, expectedSet PCRSet) bool {
 ### Overview
 
 Level 3 provides complete verification of the enclave configuration through the QuorumOS (QoS) manifest. This level 
-alidates that the specific visualsign-parser binary is running with the expected configuration and security policies.
+validates that the specific visualsign-parser binary is running with the expected configuration and security policies.
 
 ### What You Get
 
