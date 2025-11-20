@@ -372,7 +372,7 @@ Manifest Structure:
 ### Where to Find the SHA256sum
 
 The SHA256 hash of the visualsign-parser binary is stored in the **`Pivot.Hash`** field of the manifest. This 32-byte value 
-niquely identifies the exact application binary running in the enclave.
+uniquely identifies the exact application binary running in the enclave.
 
 ### Implementation
 
