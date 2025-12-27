@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turnkey Client WASM - Proof of Concept</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .section {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.info {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+        }
+        .status.success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        .status.error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Turnkey Client WASM - Proof of Concept</h1>
+
+        <div class="status info" id="loadStatus">
+            <strong>Loading WASM module...</strong>
+        </div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-label">WASM File Size</div>
+                <div class="stat-value" id="wasmSize">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Load Time</div>
+                <div class="stat-value" id="loadTime">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Memory Usage</div>
+                <div class="stat-value" id="memoryUsage">-</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Test parseTransaction</h2>
+            <p>This demonstrates calling the WASM <code>parseTransaction</code> function with test data.</p>
+
+            <label for="rawTx">Raw Transaction (hex):</label>
+            <textarea id="rawTx" placeholder="Enter raw transaction hex...">02f87301808459682f008459682f0e82520894c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2880de0b6b3a764000080c001a0c8d4e4c4a8c0a0e4c8d4e4c4a8c0a0e4c8d4e4c4a8c0a0e4c8d4e4c4a8c0a0a0c8d4e4c4a8c0a0e4c8d4e4c4a8c0a0e4c8d4e4c4a8c0a0e4c8d4e4c4a8c0</textarea>
+
+            <label for="chain">Chain:</label>
+            <input type="text" id="chain" value="ETHEREUM" placeholder="e.g., ETHEREUM, BITCOIN, SOLANA">
+
+            <label for="orgId">Organization ID:</label>
+            <input type="text" id="orgId" value="test-org-123" placeholder="Your Turnkey organization ID">
+
+            <label for="publicKey">Public Key:</label>
+            <input type="text" id="publicKey" value="04a1b2c3d4e5f6789..." placeholder="API public key">
+
+            <label for="privateKey">Private Key:</label>
+            <input type="text" id="privateKey" value="a1b2c3d4e5f6..." placeholder="API private key">
+
+            <button id="parseBtn" onclick="testParseTransaction()" disabled>
+                Parse Transaction
+            </button>
+        </div>
+
+        <div class="section" id="resultSection" style="display: none;">
+            <h3>Result:</h3>
+            <div class="result" id="result"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createImportObject } from './js_glue.js';
+
+        let wasmInstance = null;
+        let wasmMemory = null;
+        let loadStartTime = Date.now();
+
+        async function loadWasm() {
+            try {
+                console.log('Starting WASM load...');
+
+                // Fetch WASM file and track size
+                const response = await fetch('turnkey_client.wasm');
+                console.log('WASM fetched, compiling...');
+
+                const buffer = await response.arrayBuffer();
+                const sizeKB = (buffer.byteLength / 1024).toFixed(2);
+
+                document.getElementById('wasmSize').textContent = `${sizeKB} KB`;
+
+                // Compile module first
+                const module = await WebAssembly.compile(buffer);
+                console.log('WASM compiled, creating imports...');
+
+                wasmMemory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+                const importObject = createImportObject(wasmMemory);
+
+                console.log('Instantiating WASM...');
+                wasmInstance = await WebAssembly.instantiate(module, importObject);
+                console.log('WASM instantiated successfully');
+
+                const loadTime = Date.now() - loadStartTime;
+                document.getElementById('loadTime').textContent = `${loadTime}ms`;
+
+                const memoryMB = (wasmMemory.buffer.byteLength / (1024 * 1024)).toFixed(2);
+                document.getElementById('memoryUsage').textContent = `${memoryMB} MB`;
+
+                // Update UI
+                document.getElementById('loadStatus').className = 'status success';
+                document.getElementById('loadStatus').innerHTML = '<strong>✓ WASM module loaded successfully!</strong>';
+                document.getElementById('stats').style.display = 'grid';
+                document.getElementById('parseBtn').disabled = false;
+
+                // Make available globally for button onclick
+                window.wasmInstance = wasmInstance;
+                window.wasmMemory = wasmMemory;
+
+                console.log('WASM exports:', Object.keys(wasmInstance.exports));
+            } catch (error) {
+                document.getElementById('loadStatus').className = 'status error';
+                document.getElementById('loadStatus').innerHTML = `<strong>✗ Failed to load WASM:</strong><br>${error.message}<br><pre>${error.stack}</pre>`;
+                console.error('WASM load error:', error);
+            }
+        }
+
+        // Load WASM on page load
+        loadWasm();
+
+        // Export test function globally
+        window.testParseTransaction = async function() {
+            const resultSection = document.getElementById('resultSection');
+            const resultDiv = document.getElementById('result');
+            const parseBtn = document.getElementById('parseBtn');
+
+            parseBtn.disabled = true;
+            parseBtn.textContent = 'Processing...';
+
+            try {
+                const rawTx = document.getElementById('rawTx').value;
+                const chain = document.getElementById('chain').value;
+                const orgId = document.getElementById('orgId').value;
+                const publicKey = document.getElementById('publicKey').value;
+                const privateKey = document.getElementById('privateKey').value;
+
+                // Call WASM function
+                const startTime = performance.now();
+
+                // Note: Actual implementation depends on how the WASM function is exported
+                // This is a mock call - adjust based on actual WASM interface
+                let result;
+                if (wasmInstance.exports.parseTransaction) {
+                    result = wasmInstance.exports.parseTransaction(
+                        rawTx, chain, orgId, publicKey, privateKey
+                    );
+                } else {
+                    // For now, show what exports are available
+                    result = {
+                        status: 'info',
+                        message: 'WASM module loaded but parseTransaction not yet fully implemented',
+                        exports: Object.keys(wasmInstance.exports),
+                        testData: {
+                            rawTransaction: rawTx.substring(0, 50) + '...',
+                            chain: chain,
+                            organizationId: orgId
+                        }
+                    };
+                }
+
+                const duration = (performance.now() - startTime).toFixed(2);
+
+                resultSection.style.display = 'block';
+                resultDiv.textContent = JSON.stringify(result, null, 2);
+                resultDiv.textContent += `\n\n⏱️  Execution time: ${duration}ms`;
+
+                parseBtn.textContent = 'Parse Transaction';
+                parseBtn.disabled = false;
+            } catch (error) {
+                resultSection.style.display = 'block';
+                resultDiv.textContent = `Error: ${error.message}\n\nStack:\n${error.stack}`;
+                parseBtn.textContent = 'Parse Transaction';
+                parseBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

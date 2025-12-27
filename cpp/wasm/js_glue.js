@@ -95,6 +95,54 @@ async function httpFetch(method, url, headers, body) {
  */
 function createImportObject(memory) {
   return {
+    wasi_snapshot_preview1: {
+      // WASI imports (comprehensive stubs for wasi-sdk compiled modules)
+      args_get: () => 0,
+      args_sizes_get: () => 0,
+      environ_get: () => 0,
+      environ_sizes_get: () => 0,
+      clock_res_get: () => 0,
+      clock_time_get: () => 0,
+      fd_advise: () => 0,
+      fd_allocate: () => 0,
+      fd_close: () => 0,
+      fd_datasync: () => 0,
+      fd_fdstat_get: () => 0,
+      fd_fdstat_set_flags: () => 0,
+      fd_fdstat_set_rights: () => 0,
+      fd_filestat_get: () => 0,
+      fd_filestat_set_size: () => 0,
+      fd_filestat_set_times: () => 0,
+      fd_pread: () => 0,
+      fd_prestat_get: () => 8, // EBADF
+      fd_prestat_dir_name: () => 0,
+      fd_pwrite: () => 0,
+      fd_read: () => 0,
+      fd_readdir: () => 0,
+      fd_renumber: () => 0,
+      fd_seek: () => 0,
+      fd_sync: () => 0,
+      fd_tell: () => 0,
+      fd_write: () => 0,
+      path_create_directory: () => 0,
+      path_filestat_get: () => 0,
+      path_filestat_set_times: () => 0,
+      path_link: () => 0,
+      path_open: () => 0,
+      path_readlink: () => 0,
+      path_remove_directory: () => 0,
+      path_rename: () => 0,
+      path_symlink: () => 0,
+      path_unlink_file: () => 0,
+      poll_oneoff: () => 0,
+      proc_exit: () => {},
+      proc_raise: () => 0,
+      sched_yield: () => 0,
+      random_get: () => 0,
+      sock_recv: () => 0,
+      sock_send: () => 0,
+      sock_shutdown: () => 0,
+    },
     env: {
       memory,
 
@@ -208,7 +256,5 @@ function writeInt32(memory, ptr, value) {
   view.setInt32(ptr, value, true); // little-endian
 }
 
-// Export for Node.js and browser
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { createImportObject, sha256, signMessage, httpFetch };
-}
+// Export for browser (ES6 modules) and Node.js
+export { createImportObject, sha256, signMessage, httpFetch };
