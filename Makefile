@@ -1,4 +1,4 @@
-.PHONY: test test-coverage test-cover build clean help lint fmt
+.PHONY: test test-coverage test-cover build build-wasm clean clean-wasm help lint fmt
 
 # Default port for coverage server
 PORT ?= :3000
@@ -13,7 +13,9 @@ help:
 	@echo "  make test-coverage-serve       - Run tests, serve coverage on PORT (default :3000)"
 	@echo "                           		Usage: make test-cover PORT=:8080"
 	@echo "  make build             	- Build the application"
+	@echo "  make build-wasm        	- Build C++ WASM module (requires wasi-sdk)"
 	@echo "  make clean             	- Remove build artifacts and test coverage files"
+	@echo "  make clean-wasm        	- Remove WASM build artifacts"
 	@echo "  make fmt               	- Format Go code with gofmt"
 	@echo "  make check-deps        	- Check for prohibited dependencies"
 	@echo "  make lint              	- Run linter with dependency checks"
@@ -72,6 +74,18 @@ bin/:
 clean:
 	rm -rf bin/ coverage.out coverage.filtered.out coverage.out.tmp index.html
 	go clean
+
+# Build WASM module using wasi-sdk
+build-wasm:
+	@echo "Building C++ WASM module..."
+	@cd cpp/wasm && ./build.sh
+	@echo "✓ WASM build complete"
+
+# Clean WASM build artifacts
+clean-wasm:
+	@echo "Cleaning WASM artifacts..."
+	@rm -f cpp/wasm/turnkey_client.wasm
+	@echo "✓ WASM artifacts cleaned"
 
 # Run tests with strict race detection and fail on coverage below threshold
 test-strict:

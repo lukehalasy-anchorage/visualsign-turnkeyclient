@@ -13,6 +13,7 @@ A Go client for Turnkey's Visualsign API that provides end-to-end verification o
 - Validate signatures from ephemeral keys
 - Export QoS manifests for offline verification
 - Compare against reference `qos_client` implementation
+- **WebAssembly support**: Minimal C++ WASM build (<100KB) for browser integration using wasi-sdk
 
 ## Installation
 
@@ -62,6 +63,9 @@ make test-client      # Tests for client functionality
 # Run benchmarks
 make bench
 
+# Build WebAssembly module (requires wasi-sdk)
+make build-wasm
+
 # Code quality checks
 make check-deps       # Check for prohibited dependencies
 make lint             # Run linter with dependency checks
@@ -69,6 +73,7 @@ make fmt              # Format Go code
 
 # Clean build artifacts
 make clean
+make clean-wasm       # Clean WASM artifacts
 ```
 
 ### Continuous Integration
@@ -618,8 +623,11 @@ make test-cover
 ### Building
 
 ```bash
-# Build binary to bin/ directory
+# Build Go CLI binary to bin/ directory
 make build
+
+# Build C++ WebAssembly module (requires wasi-sdk)
+make build-wasm
 
 # Or build directly with go
 go build -o bin/visualsign-turnkeyclient .
@@ -627,6 +635,53 @@ go build -o bin/visualsign-turnkeyclient .
 # Or run directly without building
 go run . <command> [args...]
 ```
+
+## WebAssembly Support
+
+The project includes a minimal C++ WebAssembly build for browser integration, inspired by [MiniLisp C++](https://nextdoorhacker.com/2025/12/26/minilisp-c-a-compile-time-lisp-interpreter-in-c-20/)'s approach to minimal WASM binaries.
+
+### Why C++ + wasi-sdk?
+
+| Toolchain | Output Size | What You Get |
+|-----------|-------------|--------------|
+| **wasi-sdk + wasm-opt** | **<100KB** | Single .wasm file |
+| Go WASM | 6.1MB | Large Go runtime |
+| Emscripten | 100KB+ | .wasm + JavaScript runtime |
+
+wasi-sdk produces a minimal WASI-compliant binary without JavaScript bloat or POSIX emulation overhead.
+
+### Building WASM
+
+```bash
+# Prerequisites: Install wasi-sdk and wasm-opt
+# See cpp/wasm/README.md for installation instructions
+
+make build-wasm
+```
+
+### Using WASM in Browser
+
+```javascript
+import { createImportObject } from './cpp/wasm/js_glue.js';
+
+// Load WASM module
+const response = await fetch('cpp/wasm/turnkey_client.wasm');
+const buffer = await response.arrayBuffer();
+const module = await WebAssembly.compile(buffer);
+const memory = new WebAssembly.Memory({ initial: 256, maximum: 512 });
+const instance = await WebAssembly.instantiate(module, createImportObject(memory));
+
+// Call parseTransaction
+const result = instance.exports.parseTransaction(
+  rawTransaction,
+  chain,
+  organizationId,
+  publicKey,
+  privateKey
+);
+```
+
+For detailed WASM documentation, see [`cpp/wasm/README.md`](cpp/wasm/README.md).
 
 ### Adding New Features
 
