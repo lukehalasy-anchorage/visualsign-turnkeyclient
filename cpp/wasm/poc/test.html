@@ -185,8 +185,8 @@
             try {
                 console.log('Starting WASM load...');
 
-                // Fetch WASM file and track size
-                const response = await fetch('turnkey_client.wasm');
+                // Fetch WASM file and track size (from parent directory)
+                const response = await fetch('../turnkey_client.wasm');
                 console.log('WASM fetched, compiling...');
 
                 const buffer = await response.arrayBuffer();

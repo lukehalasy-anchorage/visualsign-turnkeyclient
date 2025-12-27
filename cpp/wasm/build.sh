@@ -38,17 +38,31 @@ echo "✓ Compiled to turnkey_client.wasm"
 if command -v $WASM_OPT &> /dev/null; then
     echo "Optimizing with wasm-opt..."
 
+    # First pass: asyncify transformation
+    # This allows C++ to call async JS functions as if they were synchronous
+    $WASM_OPT \
+        --asyncify \
+        turnkey_client.wasm \
+        -o turnkey_client.asyncify.wasm
+
+    echo "✓ Applied asyncify transformation"
+
+    # Second pass: optimize size
     $WASM_OPT \
         -Oz \
         --strip-debug \
         --strip-producers \
-        turnkey_client.wasm \
+        turnkey_client.asyncify.wasm \
         -o turnkey_client.wasm
+
+    # Clean up intermediate file
+    rm -f turnkey_client.asyncify.wasm
 
     echo "✓ Optimized with wasm-opt"
 else
-    echo "⚠️  wasm-opt not found, skipping optimization"
+    echo "⚠️  wasm-opt not found, skipping optimization and asyncify"
     echo "   Install from: https://github.com/WebAssembly/binaryen"
+    echo "   WARNING: WASM will not support async JS calls without asyncify!"
 fi
 
 # Show size

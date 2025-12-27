@@ -5,6 +5,12 @@
  * - js_fetch: HTTP requests using fetch API
  * - js_sign_message: ECDSA P-256 signature generation
  * - js_sha256: SHA-256 hashing
+ *
+ * IMPORTANT: This code uses async/await which normally doesn't work with WASM's synchronous execution.
+ * The WASM module MUST be compiled with Asyncify (via wasm-opt --asyncify) to enable the runtime
+ * to pause/resume WASM execution while async operations complete.
+ *
+ * Build process automatically applies asyncify - see build.sh for details.
  */
 
 // Crypto utilities using Web Crypto API
@@ -147,9 +153,9 @@ function createImportObject(memory) {
       memory,
 
       /**
-       * js_fetch implementation
+       * js_fetch implementation (asyncified - appears synchronous to C++)
        */
-      js_fetch: (
+      js_fetch: async (
         methodPtr, urlPtr, headersJsonPtr, bodyPtr, bodyLen,
         outResponseBodyPtr, outResponseLenPtr, outStatusCodePtr,
         outErrorPtr, outErrorLenPtr
@@ -162,19 +168,14 @@ function createImportObject(memory) {
           const headers = JSON.parse(headersJson);
           const body = bodyLen > 0 ? readBytes(memory, bodyPtr, bodyLen) : null;
 
-          // Perform fetch (async, but we need sync behavior)
-          // Note: Real implementation would use asyncify or similar
-          httpFetch(method, url, headers, body).then(result => {
-            // Write response to WASM memory
-            writeString(memory, outResponseBodyPtr, result.body);
-            writeInt32(memory, outResponseLenPtr, result.body.length);
-            writeInt32(memory, outStatusCodePtr, result.status);
-            return 0;
-          }).catch(err => {
-            writeString(memory, outErrorPtr, err.message);
-            writeInt32(memory, outErrorLenPtr, err.message.length);
-            return 1;
-          });
+          // Perform fetch (asyncify makes this work synchronously from C++ perspective)
+          const result = await httpFetch(method, url, headers, body);
+
+          // Write response to WASM memory
+          writeString(memory, outResponseBodyPtr, result.body);
+          writeInt32(memory, outResponseLenPtr, result.body.length);
+          writeInt32(memory, outStatusCodePtr, result.status);
+          return 0;
         } catch (err) {
           writeString(memory, outErrorPtr, err.message);
           writeInt32(memory, outErrorLenPtr, err.message.length);
@@ -183,9 +184,9 @@ function createImportObject(memory) {
       },
 
       /**
-       * js_sign_message implementation
+       * js_sign_message implementation (asyncified - appears synchronous to C++)
        */
-      js_sign_message: (
+      js_sign_message: async (
         messagePtr, messageLen, privateKeyPtr, keyLen,
         outSignaturePtr, outSigLenPtr
       ) => {
@@ -193,25 +194,22 @@ function createImportObject(memory) {
           const message = readBytes(memory, messagePtr, messageLen);
           const privateKey = readCString(memory, privateKeyPtr);
 
-          signMessage(new TextDecoder().decode(message), privateKey).then(signature => {
-            writeString(memory, outSignaturePtr, signature);
-            writeInt32(memory, outSigLenPtr, signature.length);
-          });
+          const signature = await signMessage(new TextDecoder().decode(message), privateKey);
+          writeString(memory, outSignaturePtr, signature);
+          writeInt32(memory, outSigLenPtr, signature.length);
         } catch (err) {
           writeInt32(memory, outSigLenPtr, -1);
         }
       },
 
       /**
-       * js_sha256 implementation
+       * js_sha256 implementation (asyncified - appears synchronous to C++)
        */
-      js_sha256: (dataPtr, dataLen, outHashPtr) => {
+      js_sha256: async (dataPtr, dataLen, outHashPtr) => {
         try {
           const data = readBytes(memory, dataPtr, dataLen);
-
-          sha256(data).then(hash => {
-            writeBytes(memory, outHashPtr, hash);
-          });
+          const hash = await sha256(data);
+          writeBytes(memory, outHashPtr, hash);
         } catch (err) {
           // Fill with zeros on error
           const view = new Uint8Array(memory.buffer);
