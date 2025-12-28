@@ -47,7 +47,7 @@ std::string sign_message(
     const std::string& message,
     const std::string& private_key_hex
 ) {
-    char signature_buf[256];
+    char signature_buf[SIGNATURE_BUFFER_SIZE];
     int sig_len = 0;
 
     js_sign_message(
@@ -71,14 +71,14 @@ std::string generate_stamp(
     const std::string& public_key_hex
 ) {
     // Create stamp message: METHOD;PATH;BODY_HASH
-    uint8_t body_hash[32];
+    uint8_t body_hash[SHA256_HASH_SIZE];
     js_sha256(body.c_str(), body.length(), body_hash);
 
     std::string body_hash_hex = hex_encode(
-        std::vector<uint8_t>(body_hash, body_hash + 32)
+        std::vector<uint8_t>(body_hash, body_hash + SHA256_HASH_SIZE)
     );
 
-    std::string stamp_message = method + ";" + path + ";" + body_hash_hex;
+    std::string stamp_message = method + crypto::STAMP_SEPARATOR + path + crypto::STAMP_SEPARATOR + body_hash_hex;
 
     // Sign the stamp message
     std::string signature = sign_message(stamp_message, private_key_hex);
@@ -88,7 +88,7 @@ std::string generate_stamp(
     }
 
     // Return formatted stamp: {publicKey}.{signature}
-    return public_key_hex + "." + signature;
+    return public_key_hex + crypto::STAMP_FORMAT_SEPARATOR + signature;
 }
 
 } // namespace crypto

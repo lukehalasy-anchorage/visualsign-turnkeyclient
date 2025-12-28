@@ -35,10 +35,10 @@ HttpResponse fetch(const HttpRequest& request) {
     headers_json += "}";
 
     // Buffers for response
-    char response_body[65536];  // 64KB buffer
+    char response_body[HTTP_RESPONSE_BUFFER_SIZE];
     int response_len = 0;
     int status_code = 0;
-    char error_buf[1024];
+    char error_buf[ERROR_BUFFER_SIZE];
     int error_len = 0;
 
     int result = js_fetch(

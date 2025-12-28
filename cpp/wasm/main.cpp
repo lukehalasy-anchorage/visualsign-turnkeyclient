@@ -23,8 +23,8 @@ std::string escape_string(const std::string& str) {
 std::string build_request(const std::string& unsigned_payload, const std::string& chain) {
     std::ostringstream oss;
     oss << "{"
-        << "\"unsignedPayload\":\"" << escape_string(unsigned_payload) << "\","
-        << "\"chain\":\"" << escape_string(chain) << "\""
+        << "\"" << json_fields::UNSIGNED_PAYLOAD << "\":\"" << escape_string(unsigned_payload) << "\","
+        << "\"" << json_fields::CHAIN << "\":\"" << escape_string(chain) << "\""
         << "}";
     return oss.str();
 }
@@ -32,12 +32,13 @@ std::string build_request(const std::string& unsigned_payload, const std::string
 // Simple JSON parser to extract signablePayload field
 std::string extract_signable_payload(const std::string& json_response) {
     // Look for "signablePayload":"..."
-    size_t start = json_response.find("\"signablePayload\"");
+    std::string field_name = std::string("\"") + json_fields::SIGNABLE_PAYLOAD + "\"";
+    size_t start = json_response.find(field_name);
     if (start == std::string::npos) {
         return "";
     }
 
-    start = json_response.find("\"", start + 17);  // Skip past "signablePayload"
+    start = json_response.find("\"", start + field_name.length());
     if (start == std::string::npos) {
         return "";
     }
@@ -89,7 +90,7 @@ int parseTransaction(
     std::string request_body = json::build_request(raw_transaction, chain);
 
     // Generate API stamp for authentication
-    std::string path = "/api/v1/create-signable-payload";
+    std::string path = CREATE_SIGNABLE_PAYLOAD_PATH;
     std::string stamp = crypto::generate_stamp(
         "POST",
         path,
@@ -108,10 +109,10 @@ int parseTransaction(
     // Prepare HTTP request
     http::HttpRequest request;
     request.method = "POST";
-    request.url = std::string("https://api.turnkey.com") + path;
-    request.headers["Content-Type"] = "application/json";
-    request.headers["X-Organization-Id"] = organization_id;
-    request.headers["X-Stamp"] = stamp;
+    request.url = std::string(API_BASE_URL) + path;
+    request.headers[http_headers::CONTENT_TYPE] = http_headers::APPLICATION_JSON;
+    request.headers[http_headers::X_ORG_ID] = organization_id;
+    request.headers[http_headers::X_STAMP] = stamp;
     request.body = request_body;
 
     // Perform HTTP request
