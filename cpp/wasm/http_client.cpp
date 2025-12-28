@@ -35,10 +35,12 @@ HttpResponse fetch(const HttpRequest& request) {
     headers_json += "}";
 
     // Buffers for response
-    char response_body[HTTP_RESPONSE_BUFFER_SIZE];
+    constexpr size_t buffer_size = 65536;
+    constexpr size_t error_size = 1024;
+    char response_body[buffer_size];
     int response_len = 0;
     int status_code = 0;
-    char error_buf[ERROR_BUFFER_SIZE];
+    char error_buf[error_size];
     int error_len = 0;
 
     int result = js_fetch(
@@ -54,9 +56,11 @@ HttpResponse fetch(const HttpRequest& request) {
         &error_len
     );
 
-    if (result != 0) {
+    constexpr int js_fetch_success = 0;
+    constexpr int error_status_code = 0;
+    if (result != js_fetch_success) {
         response.error = std::string(error_buf, error_len);
-        response.status_code = 0;
+        response.status_code = error_status_code;
         return response;
     }
 

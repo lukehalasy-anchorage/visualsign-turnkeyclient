@@ -23,8 +23,8 @@ std::string escape_string(const std::string& str) {
 std::string build_request(const std::string& unsigned_payload, const std::string& chain) {
     std::ostringstream oss;
     oss << "{"
-        << "\"" << json_fields::UNSIGNED_PAYLOAD << "\":\"" << escape_string(unsigned_payload) << "\","
-        << "\"" << json_fields::CHAIN << "\":\"" << escape_string(chain) << "\""
+        << "\"" << turnkey::json_fields::UNSIGNED_PAYLOAD << "\":\"" << escape_string(unsigned_payload) << "\","
+        << "\"" << turnkey::json_fields::CHAIN << "\":\"" << escape_string(chain) << "\""
         << "}";
     return oss.str();
 }
@@ -32,7 +32,7 @@ std::string build_request(const std::string& unsigned_payload, const std::string
 // Simple JSON parser to extract signablePayload field
 std::string extract_signable_payload(const std::string& json_response) {
     // Look for "signablePayload":"..."
-    std::string field_name = std::string("\"") + json_fields::SIGNABLE_PAYLOAD + "\"";
+    std::string field_name = std::string("\"") + turnkey::json_fields::SIGNABLE_PAYLOAD + "\"";
     size_t start = json_response.find(field_name);
     if (start == std::string::npos) {
         return "";
@@ -80,7 +80,7 @@ int parseTransaction(
 ) {
     // Validate inputs
     if (!raw_transaction || !chain || !organization_id || !public_key || !private_key) {
-        const char* err = "Invalid arguments: all parameters required";
+        constexpr const char* err = "Invalid arguments: all parameters required";
         *out_error_len = strlen(err);
         strncpy(out_error, err, *out_error_len);
         return ERROR_INVALID_ARGS;
@@ -90,9 +90,10 @@ int parseTransaction(
     std::string request_body = json::build_request(raw_transaction, chain);
 
     // Generate API stamp for authentication
+    constexpr const char* http_method = "POST";
     std::string path = CREATE_SIGNABLE_PAYLOAD_PATH;
     std::string stamp = crypto::generate_stamp(
-        "POST",
+        http_method,
         path,
         request_body,
         private_key,
@@ -100,7 +101,7 @@ int parseTransaction(
     );
 
     if (stamp.empty()) {
-        const char* err = "Failed to generate authentication stamp";
+        constexpr const char* err = "Failed to generate authentication stamp";
         *out_error_len = strlen(err);
         strncpy(out_error, err, *out_error_len);
         return ERROR_CRYPTO_FAILED;
@@ -108,7 +109,7 @@ int parseTransaction(
 
     // Prepare HTTP request
     http::HttpRequest request;
-    request.method = "POST";
+    request.method = http_method;
     request.url = std::string(API_BASE_URL) + path;
     request.headers[http_headers::CONTENT_TYPE] = http_headers::APPLICATION_JSON;
     request.headers[http_headers::X_ORG_ID] = organization_id;
@@ -124,7 +125,8 @@ int parseTransaction(
         return ERROR_HTTP_FAILED;
     }
 
-    if (response.status_code != 200) {
+    constexpr int http_ok = 200;
+    if (response.status_code != http_ok) {
         std::string err = "HTTP error: " + std::to_string(response.status_code);
         *out_error_len = err.length();
         strncpy(out_error, err.c_str(), *out_error_len);
@@ -135,7 +137,7 @@ int parseTransaction(
     std::string signable_payload = json::extract_signable_payload(response.body);
 
     if (signable_payload.empty()) {
-        const char* err = "Failed to parse signablePayload from response";
+        constexpr const char* err = "Failed to parse signablePayload from response";
         *out_error_len = strlen(err);
         strncpy(out_error, err, *out_error_len);
         return ERROR_JSON_PARSE;

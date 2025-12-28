@@ -25,19 +25,22 @@ namespace turnkey {
 namespace crypto {
 
 std::string hex_encode(const std::vector<uint8_t>& data) {
+    constexpr int hex_width = 2;
     std::ostringstream oss;
     oss << std::hex << std::setfill('0');
     for (uint8_t byte : data) {
-        oss << std::setw(2) << static_cast<int>(byte);
+        oss << std::setw(hex_width) << static_cast<int>(byte);
     }
     return oss.str();
 }
 
 std::vector<uint8_t> hex_decode(const std::string& hex) {
+    constexpr size_t hex_chars_per_byte = 2;
+    constexpr int hex_base = 16;
     std::vector<uint8_t> result;
-    for (size_t i = 0; i < hex.length(); i += 2) {
-        std::string byte_str = hex.substr(i, 2);
-        uint8_t byte = static_cast<uint8_t>(std::stoi(byte_str, nullptr, 16));
+    for (size_t i = 0; i < hex.length(); i += hex_chars_per_byte) {
+        std::string byte_str = hex.substr(i, hex_chars_per_byte);
+        uint8_t byte = static_cast<uint8_t>(std::stoi(byte_str, nullptr, hex_base));
         result.push_back(byte);
     }
     return result;
@@ -47,7 +50,8 @@ std::string sign_message(
     const std::string& message,
     const std::string& private_key_hex
 ) {
-    char signature_buf[SIGNATURE_BUFFER_SIZE];
+    constexpr size_t sig_buffer_size = 256;
+    char signature_buf[sig_buffer_size];
     int sig_len = 0;
 
     js_sign_message(
@@ -71,14 +75,16 @@ std::string generate_stamp(
     const std::string& public_key_hex
 ) {
     // Create stamp message: METHOD;PATH;BODY_HASH
-    uint8_t body_hash[SHA256_HASH_SIZE];
+    constexpr size_t hash_size = 32;
+    constexpr char stamp_sep = ';';
+    uint8_t body_hash[hash_size];
     js_sha256(body.c_str(), body.length(), body_hash);
 
     std::string body_hash_hex = hex_encode(
-        std::vector<uint8_t>(body_hash, body_hash + SHA256_HASH_SIZE)
+        std::vector<uint8_t>(body_hash, body_hash + hash_size)
     );
 
-    std::string stamp_message = method + crypto::STAMP_SEPARATOR + path + crypto::STAMP_SEPARATOR + body_hash_hex;
+    std::string stamp_message = method + std::string(1, stamp_sep) + path + std::string(1, stamp_sep) + body_hash_hex;
 
     // Sign the stamp message
     std::string signature = sign_message(stamp_message, private_key_hex);
@@ -88,7 +94,8 @@ std::string generate_stamp(
     }
 
     // Return formatted stamp: {publicKey}.{signature}
-    return public_key_hex + crypto::STAMP_FORMAT_SEPARATOR + signature;
+    constexpr char stamp_format_sep = '.';
+    return public_key_hex + std::string(1, stamp_format_sep) + signature;
 }
 
 } // namespace crypto
