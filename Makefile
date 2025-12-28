@@ -76,9 +76,57 @@ clean:
 	go clean
 
 # Build WASM module using wasi-sdk
+# Prerequisites:
+#   - wasi-sdk: https://github.com/WebAssembly/wasi-sdk/releases
+#   - wasm-opt (optional): https://github.com/WebAssembly/binaryen
 build-wasm:
 	@echo "Building C++ WASM module..."
-	@cd cpp/wasm && ./build.sh
+	@if ! command -v $${WASI_SDK_PATH:-/opt/wasi-sdk}/bin/clang++ >/dev/null 2>&1; then \
+		echo "Error: wasi-sdk not found at $${WASI_SDK_PATH:-/opt/wasi-sdk}"; \
+		echo "Please install wasi-sdk from: https://github.com/WebAssembly/wasi-sdk/releases"; \
+		echo "Or set WASI_SDK_PATH environment variable"; \
+		exit 1; \
+	fi
+	@echo "Building Turnkey Client WASM..."
+	@cd cpp/wasm && $${WASI_SDK_PATH:-/opt/wasi-sdk}/bin/clang++ \
+		-std=c++20 \
+		-Os \
+		-fno-exceptions \
+		-fno-rtti \
+		-Wl,--no-entry \
+		-Wl,--export-dynamic \
+		-Wl,--allow-undefined \
+		-o turnkey_client.wasm \
+		main.cpp \
+		http_client.cpp \
+		crypto.cpp
+	@echo "✓ Compiled to turnkey_client.wasm"
+	@if command -v $${WASM_OPT:-wasm-opt} >/dev/null 2>&1; then \
+		echo "Optimizing with wasm-opt..."; \
+		$${WASM_OPT:-wasm-opt} \
+			--asyncify \
+			cpp/wasm/turnkey_client.wasm \
+			-o cpp/wasm/turnkey_client.asyncify.wasm; \
+		echo "✓ Applied asyncify transformation"; \
+		$${WASM_OPT:-wasm-opt} \
+			-Oz \
+			--strip-debug \
+			--strip-producers \
+			cpp/wasm/turnkey_client.asyncify.wasm \
+			-o cpp/wasm/turnkey_client.wasm; \
+		rm -f cpp/wasm/turnkey_client.asyncify.wasm; \
+		echo "✓ Optimized with wasm-opt"; \
+	else \
+		echo "⚠️  wasm-opt not found, skipping optimization and asyncify"; \
+		echo "   Install from: https://github.com/WebAssembly/binaryen"; \
+		echo "   WARNING: WASM will not support async JS calls without asyncify!"; \
+	fi
+	@SIZE=$$(wc -c < cpp/wasm/turnkey_client.wasm); \
+	SIZE_KB=$$((SIZE / 1024)); \
+	echo ""; \
+	echo "✓ Build complete!"; \
+	echo "  Output: turnkey_client.wasm"; \
+	echo "  Size: $${SIZE_KB}KB ($$SIZE bytes)"
 	@echo "✓ WASM build complete"
 
 # Clean WASM build artifacts
